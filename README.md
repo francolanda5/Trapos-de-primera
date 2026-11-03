@@ -125,7 +125,6 @@ No hace falta configurar nada más. El archivo `.env.example` tiene una única v
 - El login es una simulación didáctica: todo corre en el navegador, así que no ofrece seguridad real.
 - Las imágenes de las camisetas son recreaciones generadas: marcas, sponsors y diseños no se contrastaron con fotos documentales.
 - El inicio de sesión con Google requiere configurar un Client ID propio y no se probó de punta a punta en esta entrega. El token se decodifica sin verificar la firma.
-- El detalle de lo que se cumple y lo que no está en [CUMPLIMIENTO_CONSIGNA.md](CUMPLIMIENTO_CONSIGNA.md), y en PDF en [pdfs/](pdfs/CUMPLIMIENTO_CONSIGNA.pdf).
 
 ## Cuentas de prueba
 
@@ -136,7 +135,7 @@ No hace falta configurar nada más. El archivo `.env.example` tiene una única v
 
 El modal de login también tiene un acceso rápido, "Ingresar como Administrador", para facilitar la corrección.
 
-**Google (opcional):** con `VITE_GOOGLE_CLIENT_ID` configurada aparece el botón oficial de Google; sin ella, el modal indica "Google no configurado". Quien ingresa por esa vía siempre recibe el rol de cliente. Paso a paso en [GOOGLE_OAUTH.md](GOOGLE_OAUTH.md).
+**Google (opcional):** con `VITE_GOOGLE_CLIENT_ID` configurada aparece el botón oficial de Google; sin ella, el modal indica "Google no configurado". Quien ingresa por esa vía siempre recibe el rol de cliente. El Client ID se crea en Google Cloud Console (Credenciales > ID de cliente de OAuth > Aplicación web), con `http://localhost:3000` y la URL de producción como orígenes autorizados, y se guarda en un archivo `.env.local`.
 
 ## Créditos de imágenes
 
@@ -159,4 +158,4 @@ El proyecto incluye `vercel.json`, que redirige todas las rutas a `index.html` p
 
 ## Nota sobre Vite
 
-Proyecto creado con Vite (sucesor oficial recomendado de Vue CLI, que está en modo mantenimiento); misma estructura de proyecto y mismo ecosistema Vue 3. La consigna pide Vue CLI: la explicación completa está en [POR_QUE_NO_VUE_CLI.md](POR_QUE_NO_VUE_CLI.md).
+Proyecto creado con Vite (sucesor oficial recomendado de Vue CLI, que está en modo mantenimiento); misma estructura de proyecto y mismo ecosistema Vue 3. La consigna pide Vue CLI; se usó Vite por lo explicado arriba.
