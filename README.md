@@ -4,8 +4,8 @@ Trabajo Práctico Integrador de **Práctica Profesionalizante Desarrollo Web y M
 
 ## Integrantes
 
-- [Nombre y apellido]
-- [Nombre y apellido]
+- Franco Fusco
+- Franco Landaburu
 
 ## Descripción
 
@@ -154,7 +154,7 @@ Portadas de las tarjetas "Elegí tu cancha" del Inicio, enlazadas desde Wikimedi
 
 ## Despliegue
 
-URL de producción: `[URL de Vercel]`
+URL de producción: <https://trapos-de-primera.vercel.app>
 
 El proyecto incluye `vercel.json`, que redirige todas las rutas a `index.html` para que funcionen al recargar o al entrar por un enlace directo. En Vercel alcanza con importar el repositorio: detecta Vite, compila con `npm run build` y publica `dist/`.
 
