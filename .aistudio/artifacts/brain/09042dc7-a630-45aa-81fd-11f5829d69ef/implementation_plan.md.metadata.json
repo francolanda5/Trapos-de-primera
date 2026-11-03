@@ -1,0 +1,6 @@
+{
+  "summary":  "Plan detallado de mejoras para Trapos de Primera: sistema de stock independiente por talle con validación y migración, proceso de compra completo en página dedicada (/checkout), administración de pedidos con cambio de estados y reversión de stock, modo oscuro/claro persistente, autenticación de usuarios con roles y preparación para Google OAuth, panel lateral de favoritos y navbar dinámico con logo optimizado.",
+  "updatedAt":  "2026-10-29T12:51:24.371041048Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

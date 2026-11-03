@@ -1,0 +1,8 @@
+{
+  "name": "Trapos de Primera",
+  "description": "Tienda y catálogo de camisetas del fútbol argentino actuales y retro. Aplicación SPA desarrollada con Vue.js, Vue Router, persistencia LocalStorage y consumo de API con Fetch.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
