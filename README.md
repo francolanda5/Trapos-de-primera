@@ -90,7 +90,7 @@ No hace falta configurar nada más. El archivo `.env.example` tiene una única v
 - Orden por precio, recientes y nombre. Paginación de a 9 camisetas.
 
 **Navegación**
-- Rutas: `/` Inicio, `/catalogo` Listado, `/camiseta/:id` Detalle, `/admin/camisetas` Alta, `/admin/editar/:id` Edición, `/acerca-de` Acerca de, `/guia-de-talles`, `/checkout`, `/mis-pedidos` y `/admin/pedidos`.
+- Rutas: `/` Inicio, `/catalogo` Listado, `/camiseta/:id` Detalle, `/admin/camisetas` Alta, `/admin/editar/:id` Edición, `/acerca-de` Acerca de, `/guia-de-talles`, `/checkout`, `/mis-pedidos`, `/admin/pedidos` y `/admin/mensajes`.
 - Guards: las rutas `/admin/*` piden rol administrador; `/mis-pedidos` y `/checkout` piden sesión iniciada. Si no se cumple, redirigen al Inicio y abren el modal de login.
 
 **Formularios y validaciones**
@@ -109,6 +109,7 @@ No hace falta configurar nada más. El archivo `.env.example` tiene una única v
 - Confirmar un pedido descuenta el stock de cada talle y cancelarlo lo devuelve una sola vez. Reactivar un pedido cancelado vuelve a descontar, solo si hay stock.
 - Administración de pedidos con acciones masivas: selección múltiple, confirmación y resumen del resultado.
 - Guía de talles con tabla de medidas.
+- Mensajes de contacto: lo que se escribe en el formulario de "Acerca de" se guarda y el administrador lo lee en `/admin/mensajes`, con filtros, marcado de leídos, respuesta por correo y baja. El menú del administrador avisa cuántos hay sin leer.
 
 **Galería de cada camiseta**
 - Frente, espalda y detalle, con miniaturas y fundido entre vistas. En el celular también se pasa de una a otra deslizando.
@@ -122,6 +123,7 @@ No hace falta configurar nada más. El archivo `.env.example` tiene una única v
 - Diseño responsive para celular, tablet y escritorio, botón flotante para volver arriba y modo claro/oscuro persistente.
 
 **Limitaciones conocidas**
+- Los mensajes de contacto se guardan en el navegador, sin servidor: el administrador solo ve los que se enviaron desde ese mismo navegador.
 - El login es una simulación didáctica: todo corre en el navegador, así que no ofrece seguridad real.
 - Las imágenes de las camisetas son recreaciones generadas: marcas, sponsors y diseños no se contrastaron con fotos documentales.
 - El inicio de sesión con Google requiere configurar un Client ID propio y no se probó de punta a punta en esta entrega. El token se decodifica sin verificar la firma.

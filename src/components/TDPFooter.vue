@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { resetToDefaultJerseys, theme, toggleTheme } from '../store/useStore';
+import { resetToDefaultJerseys, theme, toggleTheme, unreadMessagesCount } from '../store/useStore';
 import { isAdmin } from '../store/useAuth';
 
 function handleReset() {
@@ -78,6 +78,12 @@ function handleReset() {
             <li>
               <router-link to="/admin/pedidos" class="hover:text-[#48B0DA] transition-colors">
                 Administrar Pedidos
+              </router-link>
+            </li>
+            <li>
+              <router-link to="/admin/mensajes" class="hover:text-[#48B0DA] transition-colors">
+                Mensajes
+                <span v-if="isAdmin && unreadMessagesCount > 0" class="ml-1 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold">{{ unreadMessagesCount }}</span>
               </router-link>
             </li>
             <!-- El stock se edita desde el catálogo, que solo muestra esas acciones al admin -->

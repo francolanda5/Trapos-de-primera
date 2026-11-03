@@ -9,6 +9,7 @@ import {
   liveAnnouncement,
   filterState,
   dolarStatus,
+  unreadMessagesCount,
   theme,
   toggleTheme
 } from '../store/useStore';
@@ -159,6 +160,15 @@ function handleLogout() {
                   {{ currentUser?.role }}
                 </span>
               </button>
+              <!-- Aviso para el administrador: hay mensajes sin leer -->
+              <span
+                v-if="isAdmin && unreadMessagesCount > 0 && !isUserMenuOpen"
+                class="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-4 text-center pointer-events-none"
+                :aria-label="`${unreadMessagesCount} mensajes sin leer`"
+                role="status"
+              >
+                {{ unreadMessagesCount }}
+              </span>
 
               <!-- Dropdown Menu -->
               <div
@@ -194,6 +204,21 @@ function handleLogout() {
                   class="block px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 font-semibold text-[#48B0DA] transition-colors"
                 >
                   👕 Gestionar Camisetas
+                </router-link>
+
+                <router-link
+                  v-if="isAdmin"
+                  to="/admin/mensajes"
+                  @click="isUserMenuOpen = false"
+                  class="flex items-center justify-between gap-2 px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 font-semibold text-[#48B0DA] transition-colors"
+                >
+                  <span>✉️ Mensajes</span>
+                  <span
+                    v-if="unreadMessagesCount > 0"
+                    class="min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold leading-4 text-center"
+                  >
+                    {{ unreadMessagesCount }}
+                  </span>
                 </router-link>
 
                 <div class="border-t border-neutral-200 dark:border-neutral-700 my-1"></div>

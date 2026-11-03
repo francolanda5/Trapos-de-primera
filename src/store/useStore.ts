@@ -1,5 +1,5 @@
 import { reactive, ref, computed, watch } from 'vue';
-import type { Jersey, CartItem, FilterState, Order, OrderStatus, BuyerInfo, PaymentMethod, DeliveryMethod } from '../types';
+import type { Jersey, CartItem, FilterState, Order, OrderStatus, BuyerInfo, PaymentMethod, DeliveryMethod, ContactMessage } from '../types';
 import { INITIAL_JERSEYS } from '../data/initialJerseys';
 import { getGeneratedImages, isLegacyPhoto, upgradeJerseyImages } from '../data/jerseyImages';
 import { fetchDolarQuotes } from '../services/apiService';
@@ -690,4 +690,66 @@ export async function initializeApiService() {
     console.warn('[DolarAPI] No se pudo obtener la cotización:', error);
     dolarStatus.value = 'error';
   }
+}
+
+// 11. Mensajes del formulario de contacto. Se guardan en LocalStorage, como todo lo demás,
+// y el administrador los lee en /admin/mensajes. No hay servidor: solo se ven en este navegador.
+const MESSAGES_KEY = 'tdp_messages_v2';
+
+function loadStoredMessages(): ContactMessage[] {
+  try {
+    const raw = localStorage.getItem(MESSAGES_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Se descartan mensajes dañados para que no rompan el panel
+      if (Array.isArray(parsed)) return parsed.filter((m) => m?.id && m.email && typeof m.message === 'string');
+    }
+  } catch (e) {
+    console.error('Error al leer los mensajes de LocalStorage:', e);
+  }
+  return [];
+}
+
+export const messages = ref<ContactMessage[]>(loadStoredMessages());
+
+watch(
+  messages,
+  (newVal) => {
+    try {
+      localStorage.setItem(MESSAGES_KEY, JSON.stringify(newVal));
+    } catch (e) {
+      console.error('Error al guardar los mensajes en LocalStorage:', e);
+    }
+  },
+  { deep: true }
+);
+
+export const unreadMessagesCount = computed(() => messages.value.filter((m) => !m.read).length);
+
+export function addMessage(data: { name: string; email: string; message: string }): ContactMessage {
+  const created: ContactMessage = {
+    id: `msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    name: data.name.trim(),
+    email: data.email.trim(),
+    message: data.message.trim(),
+    createdAt: new Date().toISOString(),
+    read: false
+  };
+  messages.value.unshift(created); // el más nuevo, primero
+  return created;
+}
+
+export function setMessageRead(id: string, read: boolean) {
+  const found = messages.value.find((m) => m.id === id);
+  if (found) found.read = read;
+}
+
+export function markAllMessagesRead() {
+  messages.value.forEach((m) => {
+    m.read = true;
+  });
+}
+
+export function deleteMessage(id: string) {
+  messages.value = messages.value.filter((m) => m.id !== id);
 }

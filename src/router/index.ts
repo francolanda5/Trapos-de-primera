@@ -6,6 +6,7 @@ import ManageJerseyView from '../views/ManageJerseyView.vue';
 import AboutView from '../views/AboutView.vue';
 import CheckoutView from '../views/CheckoutView.vue';
 import AdminOrdersView from '../views/AdminOrdersView.vue';
+import AdminMessagesView from '../views/AdminMessagesView.vue';
 import UserOrdersView from '../views/UserOrdersView.vue';
 import SizeGuideView from '../views/SizeGuideView.vue';
 import { isAdmin, isAuthenticated, openLoginModal } from '../store/useAuth';
@@ -54,6 +55,12 @@ const routes: RouteRecordRaw[] = [
     path: '/admin/pedidos',
     name: 'AdminOrders',
     component: AdminOrdersView,
+    meta: { requiresAdmin: true }
+  },
+  {
+    path: '/admin/mensajes',
+    name: 'AdminMessages',
+    component: AdminMessagesView,
     meta: { requiresAdmin: true }
   },
   {

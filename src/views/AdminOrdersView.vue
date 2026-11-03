@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { orders, updateOrdersStatus, type BulkStatusResult } from '../store/useStore';
+import { orders, updateOrdersStatus, unreadMessagesCount, type BulkStatusResult } from '../store/useStore';
 import type { Order, OrderStatus } from '../types';
 import ConfirmModal from '../components/ConfirmModal.vue';
 
@@ -151,6 +151,12 @@ function formatPrice(val: number): string {
           class="px-3.5 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-[#112C3F] text-xs font-bold text-slate-700 dark:text-neutral-200 hover:border-[#48B0DA] transition-colors"
         >
           👕 Gestionar Camisetas
+        </router-link>
+        <router-link
+          to="/admin/mensajes"
+          class="px-3.5 py-2 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-[#112C3F] text-xs font-bold text-slate-700 dark:text-neutral-200 hover:border-[#48B0DA] transition-colors"
+        >
+          ✉️ Mensajes<span v-if="unreadMessagesCount > 0"> ({{ unreadMessagesCount }})</span>
         </router-link>
       </div>
     </div>

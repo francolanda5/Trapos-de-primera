@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { filterState } from '../store/useStore';
+import { addMessage, filterState } from '../store/useStore';
 
 const router = useRouter();
 
@@ -25,7 +25,8 @@ function validateContact(): boolean {
 
 function handleContactSubmit() {
   if (!validateContact()) return;
-  // Es una demostración: el mensaje no se envía a ningún servidor.
+  // No hay servidor: el mensaje se guarda en LocalStorage y el administrador lo lee en /admin/mensajes.
+  addMessage(contactForm);
   formSent.value = true;
   setTimeout(() => {
     contactForm.name = '';
@@ -82,9 +83,9 @@ function filterAscenso(category: string) {
         <!-- Right Panel: Visual Dressing Room Photograph -->
         <div class="relative bg-neutral-900 min-h-[350px] lg:min-h-[500px]">
           <img
-            alt="Perchero con camisetas de fútbol en exhibición"
+            alt="Camisetas de Boca, Argentina y Chacarita colgadas en perchas sobre una pared de ladrillos"
             class="w-full h-full object-cover object-center"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJxxYdifj1Yqvlx4BrnbvkKaFDPvfSLAPtPz94PCGjYAKWSdJ316BG4bcf_dsR_dC-P9siFyGag-U8y5-hBy6aeugTzUEgxC-_NlqGg97U6gEwh6KThDmTbpMIB1BarUSGyvPOllbiNuAzxj49fioh0bNt75RytoZhmYtwWf79Z3PK9u7g1NuRi3Z2YCx3ZTlJsB4zoSKLAOd1xhu0ed33E2TiD7dF4phFShD3X0zqvW9triNcripPfQ"
+            src="/assets/portada.webp"
           />
         </div>
       </div>
@@ -247,6 +248,7 @@ function filterAscenso(category: string) {
                   v-model="contactForm.name"
                   class="w-full bg-[#f2eee3] dark:bg-slate-800 border border-[#d8d2c2] dark:border-slate-700 rounded px-4 py-2.5 text-sm text-[#0C2333] dark:text-slate-100 focus:ring-2 focus:ring-[#48B0DA] outline-none placeholder:text-gray-500 dark:placeholder:text-gray-400"
                   placeholder="Nombre"
+                  maxlength="80"
                   type="text"
                 />
                 <p v-if="contactErrors.name" class="text-[11px] text-red-500 font-semibold mt-1">{{ contactErrors.name }}</p>
@@ -258,6 +260,7 @@ function filterAscenso(category: string) {
                   v-model="contactForm.email"
                   class="w-full bg-[#f2eee3] dark:bg-slate-800 border border-[#d8d2c2] dark:border-slate-700 rounded px-4 py-2.5 text-sm text-[#0C2333] dark:text-slate-100 focus:ring-2 focus:ring-[#48B0DA] outline-none placeholder:text-gray-500 dark:placeholder:text-gray-400"
                   placeholder="Email"
+                  maxlength="120"
                   type="email"
                 />
                 <p v-if="contactErrors.email" class="text-[11px] text-red-500 font-semibold mt-1">{{ contactErrors.email }}</p>
@@ -271,6 +274,7 @@ function filterAscenso(category: string) {
                 v-model="contactForm.message"
                 class="w-full bg-[#f2eee3] dark:bg-slate-800 border border-[#d8d2c2] dark:border-slate-700 rounded px-4 py-2.5 text-sm text-[#0C2333] dark:text-slate-100 focus:ring-2 focus:ring-[#48B0DA] outline-none placeholder:text-gray-500 dark:placeholder:text-gray-400 resize-y"
                 placeholder="Mensaje"
+                maxlength="1000"
                 rows="5"
               ></textarea>
               <p v-if="contactErrors.message" class="text-[11px] text-red-500 font-semibold mt-1">{{ contactErrors.message }}</p>

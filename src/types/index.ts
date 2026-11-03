@@ -81,6 +81,16 @@ export interface Order {
   historyNotes?: string[];
 }
 
+// Mensaje enviado desde el formulario de contacto de "Acerca de". Lo lee el administrador.
+export interface ContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  message: string;
+  createdAt: string;
+  read: boolean;
+}
+
 export interface User {
   id: string;
   email: string;
