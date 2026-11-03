@@ -1,157 +1,162 @@
-# TRAPOS DE PRIMERA — Camisetas Argentinas (Vue.js SPA)
+# Trapos de Primera
 
-**Materia**: Práctica Profesionalizante Desarrollo Web y Mobile  
-**Institución**: ISEC — Tecnicatura Superior en Diseño Multimedial  
-**Docente**: ROMERO, Facundo  
-**Modalidad**: Trabajo Práctico Integrador Final / Examen  
+Trabajo Práctico Integrador de **Práctica Profesionalizante Desarrollo Web y Mobile**, Tecnicatura Superior en Diseño Multimedial, ISEC. Docente: Romero, Facundo.
 
----
+## Integrantes
 
-## 📌 Descripción del Proyecto
+- [Nombre y apellido]
+- [Nombre y apellido]
 
-**Trapos de Primera** es una Single Page Application (SPA) para comercio electrónico y gestión integral de indumentaria futbolística argentina. Reúne camisetas oficiales de la temporada actual y reediciones históricas retro de Primera División, Primera Nacional, Primera B Metropolitana y la Selección Argentina.
+## Descripción
 
-La aplicación replica el diseño y proporciones de las maquetas originales, e incorpora un sistema CRUD completo, gestión de inventario por talle, persistencia en `localStorage`, autenticación con roles diferenciados (Cliente y Administrador), integración con Google Identity Services (GIS), pasarela de checkout por pasos, panel de gestión de pedidos con reversión automática de stock, alternancia de modo claro/oscuro y consumo de API externa vía `Fetch`.
+**Trapos de Primera** es una SPA (Single Page Application) hecha con Vue 3 que simula una tienda de camisetas del fútbol argentino: actuales y retro, de Primera División, Primera Nacional, Primera B Metropolitana y la Selección.
 
----
+Permite gestionar un catálogo de 18 camisetas con stock por talle, buscar y filtrar, comprar con un checkout de 5 pasos y administrar los pedidos. Los datos se guardan en el `localStorage` del navegador y además se consume una API pública con `fetch`.
 
-## 🚀 Tecnologías y Herramientas
+Es una aplicación de práctica: no hay servidor, ni cobros, ni envío real de mensajes.
 
-- **Framework**: [Vue.js 3](https://vuejs.org/) (Composition API con `<script setup lang="ts">`)
-- **Enrutador**: [Vue Router 4](https://router.vuejs.org/) (Modo History con ScrollBehavior)
-- **Bundler y Dev Server**: [Vite 8](https://vitejs.dev/) + `@vitejs/plugin-vue`
-- **Estilos y Maquetación**: [Tailwind CSS v4](https://tailwindcss.com/)
-- **Lenguaje**: TypeScript (Strict Mode)
-- **Criptografía**: Web Crypto API nativa (`crypto.subtle.digest('SHA-256')`) para almacenamiento seguro de contraseñas
-- **Persistencia**: `localStorage` (catálogo de 18 camisetas, stock por talle, carrito, favoritos por usuario, pedidos con comprobantes y modo de tema)
-- **Consumo de API**: `fetch()` asincrónico para sincronización remota (Supabase REST) y cotizaciones en vivo (Dólar API)
+## Tecnologías
 
----
+| Tecnología | Uso |
+|---|---|
+| Vue 3.5 | Framework. Composition API con `<script setup>`, y Options API en `ScrollTopButton.vue` |
+| Vue Router 5 | Rutas de la SPA y guards de acceso |
+| Vite 8 | Servidor de desarrollo y compilación (ver [Nota sobre Vite](#nota-sobre-vite)) |
+| TypeScript 7 | Tipado |
+| Tailwind CSS 4 | Estilos y diseño responsive |
+| LocalStorage | Persistencia de datos |
+| Fetch API | Consumo de DolarAPI |
+| Web Crypto API | Hash SHA-256 de las contraseñas |
 
-## 🛠️ Cumplimiento de la Consigna del Examen (ISEC)
+## Instrucciones de instalación
 
-### 1. Gestión de Elementos (CRUD Completo)
-- **Crear**: Formulario de alta en `/admin/camisetas` con carga de stock independiente por talle (S, M, L, XL, XXL) y cálculo reactivo del stock total.
-- **Visualizar**: Listado dinámico en `/catalogo` con paginación, y vista enriquecida en `/camiseta/:id`.
-- **Modificar**: Edición completa en `/admin/editar/:id`.
-- **Eliminar**: Baja con diálogo modal de confirmación `ConfirmModal.vue`.
-- **Mínimo de 15 elementos**: 18 camisetas reales iniciales de clubes de Primera, Ascenso y la Selección Argentina.
-
-### 2. Búsqueda, Filtrado y Ordenamiento
-- **Buscador por texto**: Búsqueda en tiempo real desde el Navbar global y desde el catálogo.
-- **Filtro por categoría**: Primera División, Primera Nacional, Primera B Metropolitana, Selección Argentina.
-- **Filtro por época**: Actuales vs. Retro, y décadas ('80, '90, '00, '10).
-- **Filtro por equipo**: Búsqueda reactiva de clubes y filtrado múltiple.
-- **Filtro por talle**: S, M, L, XL, XXL con detección de stock real.
-- **Filtro de precio**: Slider continuo de ARS 0 a ARS 300.000.
-- **Ordenamiento**: Menor a mayor precio, mayor a menor precio, más recientes y alfabético.
-
-### 3. Navegación con Vue Router (8 Rutas)
-- `/`: **Inicio** (Hero, categorías interactivas, banners Actuales/Retro, Recién llegadas, Maratón 1986, Banner Ascenso y Más buscadas).
-- `/catalogo`: **Catálogo** (Filtros en sidebar colapsable, grilla animada, contador de productos y paginación).
-- `/camiseta/:id`: **Detalle de Producto** (Galería fotográfica, selector de talle con indicación de stock y agotado, acordeones técnicos y sugerencias).
-- `/checkout`: **Proceso de Compra** (5 pasos guiados: Revisión de productos, Datos del comprador, Envío o retiro, Medio de pago con subida de comprobante y Confirmación con código de orden).
-- `/mis-pedidos`: **Historial del Cliente** (Seguimiento de pedidos realizados).
-- `/admin/camisetas`: **Alta de Camiseta** (Editor con vista previa en vivo).
-- `/admin/editar/:id`: **Edición de Camiseta**.
-- `/admin/pedidos`: **Gestión de Pedidos** (Filtro por estado, visor de comprobante en base64, cambio de estado a Pagado o Cancelado con reversión atómica de stock).
-- `/acerca-de`: **Institucional** (Historia, valores, sección de ascenso y formulario de contacto).
-
-### 4. Formularios y Validaciones
-- Enlace bidireccional reactivo con `v-model`.
-- Validaciones personalizadas con alertas visibles:
-  - Campos obligatorios (nombre, equipo, categoría, época, temporada, precio, stock por talle, descripción, imagen).
-  - Longitud mínima (nombre $\ge 3$ caracteres, descripción $\ge 15$ caracteres).
-  - Formatos válidos (precio $> 0$, stock $\ge 0$, temporadas numéricas).
-  - Prevención de doble clic y estados deshabilitados durante el envío.
-
-### 5. Persistencia Local
-- Todo el estado se sincroniza en `localStorage`:
-  - `tdp_jerseys_v2`: Catálogo completo con `sizeStock`.
-  - `tdp_cart_v2`: Carrito con talle y cantidad.
-  - `tdp_favorites_v2_[userId]`: Favoritos vinculados al usuario logueado.
-  - `tdp_orders_v2`: Pedidos con información de comprador, items, totales y comprobantes en base64.
-  - `tdp_theme_v2`: Preferencia de tema Claro / Oscuro.
-  - `tdp_users_v1` y `tdp_current_user_v1`: Usuarios registrados (con contraseñas hasheadas en SHA-256) y sesión activa.
-
-### 6. Consumo de API con Fetch
-- Módulo `src/services/supabaseService.ts`:
-  - Consumo HTTP `fetch()` con endpoints REST de Supabase.
-  - Sincronización en segundo plano y fallback automático con manejo de estados (`idle`, `loading`, `success`, `fallback`).
-  - Consulta de cotización Dólar API para conversión referencial.
-
-### 7. Requisitos Técnicos de Vue
-- **Componentes Reutilizables (9 componentes)**:
-  1. `TDPNavbar.vue` (Navegación activa según queries, buscador, carrito, favoritos y selector de tema)
-  2. `TDPFooter.vue` (Pie institucional, enlaces de administración y reset de base de datos)
-  3. `ProductCard.vue` (Tarjeta vertical y horizontal con selección de talle y deshabilitado por falta de stock)
-  4. `SearchBar.vue` (Barra de búsqueda reactiva con two-way binding y emits)
-  5. `FilterAccordion.vue` (Acordeón colapsable para filtros y especificaciones técnicas)
-  6. `CartDrawer.vue` (Drawer lateral con selector de cantidad y botón directo a Checkout)
-  7. `FavoritesDrawer.vue` (Drawer lateral de favoritos con transición de lista y acceso a detalle)
-  8. `AuthModal.vue` (Modal de autenticación con Google GIS y acceso rápido para pruebas)
-  9. `ConfirmModal.vue` (Modal de confirmación para bajas de producto y cancelaciones de pedidos)
-- **Comunicación entre componentes**: Riguroso uso de `props` y `emits`.
-- **Computed Properties**: `filteredJerseys`, `cartTotal`, `cartCount`, `favoritesCount`, `paginatedJerseys`, `totalPages`, `recentArrivals`, `mostSearched`, `totalStock`, etc.
-- **Ciclo de Vida**:
-  - `created()` (fase ejecutada en el cuerpo de `<script setup>` antes del montaje).
-  - `onMounted()` para inicialización de APIs, renderizado de Google Identity Services y scroll restoration.
-- **Transiciones**:
-  - `<transition name="fade">`, `<transition name="slide">`, `<transition name="modal">`.
-  - `<transition-group name="list">` y `<transition-group name="cart-item">`.
-- **Diseño Responsive**: Probado en móviles, tablets y monitores de escritorio.
-
----
-
-## 🎨 Identidad Visual y Modo Claro / Oscuro
-
-El proyecto aplica la paleta institucional de Trapos de Primera:
-- **Azul marino profundo**: `#0C2333`
-- **Celeste bandera**: `#48B0DA`
-- **Blanco cálido**: `#F7F4EA`
-- **Dorado de laureles**: `#D8B15E`
-
-El botón en el Navbar permite alternar entre Modo Claro y Modo Oscuro, aplicando la clase `dark` al elemento raíz y persistiendo la selección en `localStorage`.
-
----
-
-## 🔐 Autenticación y Roles
-
-La plataforma separa la autenticación de la autorización:
-1. **Cuentas Preconfiguradas para Pruebas**:
-   - **Administrador**: `admin@traposdeprimera.com` / `admin123`
-   - **Cliente**: `franco@gmail.com` / `cliente123`
-   - *(En el modal de inicio de sesión existe un botón "Ingresar como Admin de prueba" para facilitar la corrección rápida).*
-2. **Seguridad**: Las contraseñas nunca se guardan en texto plano; se utiliza SHA-256 mediante `crypto.subtle`.
-3. **Google Identity Services (GIS)**:
-   - Configurar la variable de entorno `VITE_GOOGLE_CLIENT_ID` en el archivo `.env`.
-   - Si no está configurada, el modal provee un simulador transparente que emula el token JWT de Google con rol `customer`.
-   - Cualquier usuario que ingresa vía Google obtiene exclusivamente el rol `customer`, garantizando que el acceso administrativo sea reservado.
-
----
-
-## 📦 Inventario por Talle y Flujo de Checkout
-
-1. **Stock por Talle**: Cada camiseta tiene un diccionario `sizeStock: { S: number, M: number, L: number, XL: number, XXL: number }`. En las tarjetas y fichas de producto, los talles sin stock quedan deshabilitados visualmente (`line-through` y cursor no disponible).
-2. **Checkout en 5 Pasos**:
-   - Paso 1: Revisión de prendas y talles seleccionados.
-   - Paso 2: Información del comprador con validaciones de email y teléfono.
-   - Paso 3: Método de entrega (Envío a domicilio o Retiro en tienda).
-   - Paso 4: Método de pago (Efectivo, Tarjeta de crédito o Transferencia / Mercado Pago con subida de comprobante).
-   - Paso 5: Resumen y confirmación final generando el código de pedido (ej: `TDP-2026-XXXX`).
-3. **Deducción y Reversión Atómica**: Al confirmar el pedido, el stock del talle exacto se descuenta de forma inmediata. Si un administrador cancela el pedido desde `/admin/pedidos`, el sistema restaura automáticamente el stock a cada talle involucrado.
-
----
-
-## 💻 Instalación y Ejecución
+Hace falta [Node.js](https://nodejs.org/) 20.19 o superior (o 22.12 o superior).
 
 ```bash
 # 1. Instalar dependencias
 npm install
 
-# 2. Iniciar servidor en modo desarrollo
+# 2. Levantar el servidor de desarrollo (http://localhost:3000)
 npm run dev
 
-# 3. Compilar para producción
-npm run build
+# Otros comandos
+npm run build     # compila la app para producción en dist/
+npm run preview   # sirve lo compilado en dist/
+npm run lint      # chequeo de tipos con TypeScript
 ```
+
+No hace falta configurar nada más. El archivo `.env.example` tiene una única variable opcional, `VITE_GOOGLE_CLIENT_ID`, explicada en [Cuentas de prueba](#cuentas-de-prueba).
+
+## Capturas de pantalla
+
+### Escritorio
+
+| Inicio | Catálogo |
+|---|---|
+| ![Inicio](docs/screenshots/inicio-escritorio.png) | ![Catálogo con acciones de administrador](docs/screenshots/catalogo-escritorio.png) |
+
+| Detalle | Acerca de |
+|---|---|
+| ![Detalle de camiseta](docs/screenshots/detalle-escritorio.png) | ![Acerca de](docs/screenshots/acerca-de-escritorio.png) |
+
+| Alta con validaciones | Administración de pedidos |
+|---|---|
+| ![Formulario de alta con errores](docs/screenshots/alta-validaciones-escritorio.png) | ![Administración de pedidos](docs/screenshots/admin-pedidos-escritorio.png) |
+
+**Datos de la API**
+
+![Barra superior con la cotización de DolarAPI](docs/screenshots/api-escritorio.png)
+
+### Celular (375 px)
+
+| Inicio | Catálogo | Detalle | Alta con validaciones |
+|---|---|---|---|
+| <img src="docs/screenshots/inicio-movil.png" alt="Inicio en celular" width="180"> | <img src="docs/screenshots/catalogo-movil.png" alt="Catálogo en celular" width="180"> | <img src="docs/screenshots/detalle-movil.png" alt="Detalle en celular" width="180"> | <img src="docs/screenshots/alta-validaciones-movil.png" alt="Alta en celular" width="180"> |
+
+### Tablet (768 px) en modo oscuro
+
+<img src="docs/screenshots/catalogo-tablet-oscuro.png" alt="Catálogo en tablet con modo oscuro" width="420">
+
+## Funcionalidades implementadas
+
+**Gestión de camisetas (CRUD)**
+- Alta, edición y baja desde el rol administrador. La baja pide confirmación en un modal.
+- 18 camisetas iniciales y un botón al pie, "Restaurar inventario inicial", que vuelve a ese estado.
+- Stock independiente por talle (S a XXL), con cálculo automático del total.
+
+**Búsqueda, filtros y orden**
+- Buscador por texto en la barra superior y en el catálogo.
+- Filtros por categoría, época, década, equipo, talle con stock y precio máximo.
+- Orden por precio, recientes y nombre. Paginación de a 9 camisetas.
+
+**Navegación**
+- Rutas: `/` Inicio, `/catalogo` Listado, `/camiseta/:id` Detalle, `/admin/camisetas` Alta, `/admin/editar/:id` Edición, `/acerca-de` Acerca de, `/guia-de-talles`, `/checkout`, `/mis-pedidos` y `/admin/pedidos`.
+- Guards: las rutas `/admin/*` piden rol administrador; `/mis-pedidos` y `/checkout` piden sesión iniciada. Si no se cumple, redirigen al Inicio y abren el modal de login.
+
+**Formularios y validaciones**
+- Formularios con `v-model` y validaciones propias, con el mensaje de error junto a cada campo: alta y edición, login y registro, checkout y contacto.
+- Se valida obligatoriedad, longitud mínima y formato (temporada, precio, stock entero, URL de imagen, email, teléfono).
+
+**Persistencia en LocalStorage**
+- Camisetas, carrito, pedidos, favoritos por usuario, usuarios, sesión y tema. Los datos sobreviven a recargar y a cerrar el navegador.
+
+**Consumo de APIs con fetch** (`src/services/apiService.ts`)
+- **DolarAPI**: la cotización del dólar tarjeta se muestra en la barra superior, en todas las páginas. Si la API falla, queda un texto fijo y la app sigue funcionando.
+
+**Compras y pedidos**
+- Carrito lateral y checkout de 5 pasos, con sesión iniciada. El comprobante de pago se puede adjuntar y se guarda en base64.
+- Favoritos y pedidos por cuenta: cada una ve solo los suyos. El panel de administración ve todos los pedidos.
+- Confirmar un pedido descuenta el stock de cada talle y cancelarlo lo devuelve una sola vez. Reactivar un pedido cancelado vuelve a descontar, solo si hay stock.
+- Administración de pedidos con acciones masivas: selección múltiple, confirmación y resumen del resultado.
+- Guía de talles con tabla de medidas.
+
+**Galería de cada camiseta**
+- Frente, espalda y detalle, con miniaturas y fundido entre vistas. En el celular también se pasa de una a otra deslizando.
+- Las camisetas creadas a mano funcionan con una sola imagen.
+
+**Técnicos de Vue**
+- 10 componentes en `src/components/`, comunicados con props y emits.
+- Propiedades computadas: `filteredJerseys`, `cartTotal`, `paginatedJerseys`, `totalPages` y otras.
+- Hooks `created()` y `mounted()` en `ScrollTopButton.vue`, y `onMounted()` de Composition API, por ejemplo en `App.vue`.
+- Animaciones con `<transition>` y `<transition-group>`.
+- Diseño responsive para celular, tablet y escritorio, botón flotante para volver arriba y modo claro/oscuro persistente.
+
+**Limitaciones conocidas**
+- El login es una simulación didáctica: todo corre en el navegador, así que no ofrece seguridad real.
+- Las imágenes de las camisetas son recreaciones generadas: marcas, sponsors y diseños no se contrastaron con fotos documentales.
+- El inicio de sesión con Google requiere configurar un Client ID propio y no se probó de punta a punta en esta entrega. El token se decodifica sin verificar la firma.
+- El detalle de lo que se cumple y lo que no está en [CUMPLIMIENTO_CONSIGNA.md](CUMPLIMIENTO_CONSIGNA.md), y en PDF en [pdfs/](pdfs/CUMPLIMIENTO_CONSIGNA.pdf).
+
+## Cuentas de prueba
+
+| Rol | Email | Contraseña |
+|---|---|---|
+| Administrador | `admin@traposdeprimera.com` | `admin123` |
+| Cliente | `franco@gmail.com` | `cliente123` |
+
+El modal de login también tiene un acceso rápido, "Ingresar como Administrador", para facilitar la corrección.
+
+**Google (opcional):** con `VITE_GOOGLE_CLIENT_ID` configurada aparece el botón oficial de Google; sin ella, el modal indica "Google no configurado". Quien ingresa por esa vía siempre recibe el rol de cliente. Paso a paso en [GOOGLE_OAUTH.md](GOOGLE_OAUTH.md).
+
+## Créditos de imágenes
+
+Las imágenes de las camisetas (`public/assets/jerseys/`) son recreaciones generadas para este trabajo académico. Los escudos y las marcas de clubes y sponsors son de sus dueños.
+
+Portadas de las tarjetas "Elegí tu cancha" del Inicio, enlazadas desde Wikimedia Commons (`src/data/categoryCovers.ts`). Se muestran recortadas y con un degradé encima.
+
+| Tarjeta | Foto | Autor | Licencia |
+|---|---|---|---|
+| Primera División | [La Bombonera de noche](https://commons.wikimedia.org/wiki/File:Estadio_Alberto_J._Armando_field_night_view.jpg) | Ministerio de Cultura de la Nación | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0) |
+| Primera Nacional | [Tribuna de Chacarita Juniors](https://commons.wikimedia.org/wiki/File:Estadio_chacarita_juniors.jpg) | EstudiantesFotografias | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) |
+| Primera B Metropolitana | [Estadio Don León Kolbowsky, de Atlanta](https://commons.wikimedia.org/wiki/File:Estadio_Don_Le%C3%B3n_Kolbowsky,_del_Club_Atl%C3%A9tico_Atlanta.jpg) | Ulises Icardi | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0) |
+| Selección Argentina | [Hinchada argentina en el Maracaná, final del Mundial 2014](https://commons.wikimedia.org/wiki/File:Argentinian_Fans_-_140713-8433-jikatu_(14679000633).jpg) | Jimmy Baikovicius | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0) |
+
+## Despliegue
+
+URL de producción: `[URL de Vercel]`
+
+El proyecto incluye `vercel.json`, que redirige todas las rutas a `index.html` para que funcionen al recargar o al entrar por un enlace directo. En Vercel alcanza con importar el repositorio: detecta Vite, compila con `npm run build` y publica `dist/`.
+
+## Nota sobre Vite
+
+Proyecto creado con Vite (sucesor oficial recomendado de Vue CLI, que está en modo mantenimiento); misma estructura de proyecto y mismo ecosistema Vue 3. La consigna pide Vue CLI: la explicación completa está en [POR_QUE_NO_VUE_CLI.md](POR_QUE_NO_VUE_CLI.md).

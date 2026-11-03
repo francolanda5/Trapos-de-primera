@@ -82,6 +82,7 @@ function goToCatalog() {
                 :src="item.jersey.image"
                 :alt="item.jersey.name"
                 class="w-16 h-16 object-contain bg-[#F7F4EA] dark:bg-[#081722] rounded p-1 shrink-0"
+                loading="lazy"
               />
 
               <div class="flex-1 min-w-0">

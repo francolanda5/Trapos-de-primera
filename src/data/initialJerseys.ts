@@ -1,6 +1,7 @@
 import type { Jersey } from '../types';
+import { getGeneratedImages } from './jerseyImages';
 
-export const INITIAL_JERSEYS: Jersey[] = [
+const JERSEYS: Jersey[] = [
   {
     id: 'arg-1986',
     name: 'Argentina 1986',
@@ -47,7 +48,7 @@ export const INITIAL_JERSEYS: Jersey[] = [
     sizes: ['S', 'M', 'L', 'XL'],
     garmentType: 'Versión hincha',
     image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBr3TQ2DLOQBK3njgIjj2M3dHvpOB1d66zBdcHv0ai7Fe2bcy70sLa3I7LWRZd4TUQ1tI3cRGkr4LvQ4LDhAqc6SO1ELZkwDSzwImWJAyi8dG9_CS7yOHNRS5PnR9DuVFSjBgUWQlxoVF7ft9XhJrVdBn82zH3_VxJZXRHT-i-eFwMbPGP25S4_8RySKK20kECX7yVnKtgfjy_C0ZyY7lZhUdTv8sISTw_cNMjrBE0QdVXlZUMgXpanXg',
-    description: 'Camiseta oficial titular de Boca Juniors temporada 2024/25. Azul y oro tradicional con tecnología de ventilación AEROREADY y escudo tejido con detalle estrellado.',
+    description: 'Camiseta titular de Boca Juniors, temporada 2024/25. La tradicional azul y oro, con la franja horizontal en el pecho.',
     newArrival: true,
     mostSearched: true
   },
@@ -85,7 +86,7 @@ export const INITIAL_JERSEYS: Jersey[] = [
     sizes: ['S', 'M', 'L', 'XL'],
     garmentType: 'Versión hincha',
     image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCT2upxDmIgK7Gfz_DVy1XYAjZTpVDN9-PFpm-6yUeLmgPr2tyQEjkeqOsdmSGRm0vhYrrpQ2J8L3SinNSMDfEC70ZWxUGowtSqTldWjarMKF9Pf3FKZVon3K1HU9YmdwNfad1eS3YZ8crIUqietbUQcsfgaAkJ2nq4ACzzOXCZa0sFNlL71wFqFl_NU29P7KupOPz-qkwiM7AuMYapLI9nIk8wJtB1GkegHC4N3FrQdvVSC0AQmvL2uA',
-    description: 'Camiseta titular de Racing Club temporada 2024/25. Franjas celestes y blancas verticales con cuello elástico y escudo termoaplicado.',
+    description: 'Camiseta titular de Racing Club temporada 2024/25. Las clásicas franjas verticales celestes y blancas.',
     newArrival: true
   },
   {
@@ -121,7 +122,7 @@ export const INITIAL_JERSEYS: Jersey[] = [
     sizes: ['S', 'M', 'L', 'XL'],
     garmentType: 'Versión hincha',
     image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBiF3NKmL1b2EJskn2K7Ymi116OWGG6v4yMsCMjt5t8vT2PgdMWViCSYk7hARtpLBHdwPR_K76H_TevxOLMEF13Ch0Wzf-FOIYfB9JGvDqaS4d5oLZmcXGtn7DypM1RxcVr3SqCjq375V_sivmXY-DOpRjg73U9tZLTQcHOqYMpt_YZhZ28oTbv4yndtAu_xYDoIlkfY_UM6SxDolaO35up7Lwjwr5t6eY2ADGOszuACFFfNnFwbnUwBg',
-    description: 'Camiseta titular de San Lorenzo de Almagro 2024/25. Azulgrana a franjas verticales con cuello redondo y el histórico escudo CASLA en el pecho.',
+    description: 'Camiseta titular de San Lorenzo de Almagro 2024/25. Azulgrana a franjas verticales, con el histórico escudo en el pecho.',
     mostSearched: true
   },
   {
@@ -139,7 +140,7 @@ export const INITIAL_JERSEYS: Jersey[] = [
     sizes: ['S', 'M', 'L', 'XL'],
     garmentType: 'Versión hincha',
     image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC1XZdwReXDnwD5oeDrT7-NFKctos96qJw45J-mvvsWH9jBGYmo4KakYhleVQfsh8nGo5voH5rvHJwQ9ZJqz3qho7sIE7OP6sgl5KXAlrRLNvsEJfSeb37I1JBdUlnDv7xGUj8dvEKyzlHSBTE1AFskzcASF3sQQ0qNR4jen9BnvJXEqf4LAzPrwsFMw_FRnW8fBc2sahSPE6AbK1s7_XuT3fFr3K5i2g3JZsWgQDl7BsaN3a9H7XIT7w',
-    description: 'Camiseta titular de Estudiantes de La Plata 2024/25. Bastones rojos y blancos con detalles dorados conmemorativos y escudo bordado.',
+    description: 'Camiseta titular de Estudiantes de La Plata 2024/25. Los tradicionales bastones rojos y blancos.',
     mostSearched: true
   },
   {
@@ -157,7 +158,7 @@ export const INITIAL_JERSEYS: Jersey[] = [
     sizes: ['S', 'M', 'L', 'XL'],
     garmentType: 'Versión hincha',
     image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCfced0xdoLRaWxaxTxpjNU_dY9bARJzKtvwq16gQLm7DZlaTy08wPPEt5Ke-o3YuHveFjOLIpb0zWdJoRWi2XNkF7__2yImjnPK18Y7qXkDCiNJ5ITzRBuEs5tFhjrG1_eaqMM6gQQd7x1Z7CDxJCXPpiWPwdtQiC9oZcVnY8slAhRGEoxwe2hkOWGeJuok0eOecKmk3nU06R8Q8zToh5eHGWKXLqGAZCncv4Y5kQTrwsQrc39BAfBxA',
-    description: 'Camiseta titular del Club Atlético Vélez Sarsfield 2024/25. Fondo blanco con la mítica "V" azulada en el pecho y cuello polo moderno.',
+    description: 'Camiseta titular del Club Atlético Vélez Sarsfield 2024/25. Fondo blanco con la mítica "V" azul en el pecho.',
     mostSearched: true
   },
   {
@@ -193,7 +194,7 @@ export const INITIAL_JERSEYS: Jersey[] = [
     sizes: ['S', 'M', 'L', 'XL'],
     garmentType: 'Reedición retro',
     image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCdTds3h9NNGCpSOD0K_l77Ez-JsHtMnAI9m4wECUnyVPqBwmKwpQmXXtAmq-fknf4PI_B9yU0L3tQMl_EXNa0CZ1Z5S7F-dGjQJv8TinijjGUrrUDFoNBRbXSrLe6OQrkLluyNF-bf0jJc3hpEK-MXSwTctBn_B22g26R78aN7QFdb3_jTI-oYm3u60Ko3Sn3tQaODBr6H4tcm-_XO341DvJyaThpG5pfthB9qTEJen6fDSGd5zABmSg',
-    description: 'Camiseta titular verde de Ferro Carril Oeste año 1998 con sponsor Lepore en felpa y escudo de Caballito bordado.',
+    description: 'Camiseta titular verde de Ferro Carril Oeste, año 1998, el club de Caballito. Cuello y vivos blancos.',
     featured: true
   },
   {
@@ -247,7 +248,7 @@ export const INITIAL_JERSEYS: Jersey[] = [
     sizes: ['S', 'M', 'L', 'XL'],
     garmentType: 'Reedición retro',
     image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDoFuIR46sMR7GxcPtaorMjHYVkK09e3xUE4nNvlzjIZ6tROCUWGG4MmNRHdo-gd-MgNKkADAd-WaSdzDGQI4KR17muyueu_EB35vG-Wx0wVckUtBnW8u8X5zRlyt0BGXn_k_CdNVmBLuowCiksU5IODaP4knqsnLgbJApn9Iw7_S7KggJjDz_k9dBFBg1W1ilXmmj_Yvy3Aqz3JI54e6cVmgE-_VmraOYF4gsNOLOeLgh-8fwcdLT4uA',
-    description: 'Inconfundible camiseta alternativa azul con rombos oscuros en el costado derecho. El golazo de Maradona a Grecia en el Mundial USA 94.',
+    description: 'Inconfundible camiseta alternativa azul, con rombos oscuros en un costado, de la época del Mundial de Estados Unidos 1994.',
     featured: true
   },
   {
@@ -265,7 +266,7 @@ export const INITIAL_JERSEYS: Jersey[] = [
     sizes: ['S', 'M', 'L', 'XL', 'XXL'],
     garmentType: 'Versión hincha',
     image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAtK7AmERvAeFkoG9fzxTpsSeKt-Fv0_J-rN5DwehqzfP8LyDZbMuc5ogcuw2t-Rd4af6beG1iPzCM11MEQDzCb_zHyhd8X01wkAuQqwwjpOp7A0_gQ5cXPXLSxZ54HVRUYcZc7iMP3nUyYW3RLfEmJ2ExEngkqEmyGy216mzutjTiS6t4sP6T4A9w0RX-qVTIDSmhN9wCJ8UBK8eIQVNv4sWaRaLbJkG0DF7my_J_CIRNVV23HDcLVBw',
-    description: 'La camiseta de los campeones del mundo en Qatar 2022. Tres estrellas doradas sobre el escudo de AFA y sol de mayo en la nuca.',
+    description: 'La camiseta titular de la Selección campeona del mundo en Qatar 2022, con las franjas celestes y blancas.',
     featured: true
   },
   {
@@ -337,3 +338,9 @@ export const INITIAL_JERSEYS: Jersey[] = [
     description: 'El Torito de Mataderos. Verde y negro inconfundible con toda la mística del barrio y el ascenso.'
   }
 ];
+
+// Si una camiseta tiene imágenes propias, reemplazan a las fotos remotas (ver jerseyImages.ts).
+export const INITIAL_JERSEYS: Jersey[] = JERSEYS.map((jersey) => ({
+  ...jersey,
+  ...getGeneratedImages(jersey.id)
+}));

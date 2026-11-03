@@ -74,7 +74,7 @@ function goToCatalog() {
                 @click="goToProduct(jersey.id)"
                 class="w-16 h-16 object-contain bg-[#F7F4EA] dark:bg-[#081722] rounded p-1 shrink-0 cursor-pointer flex items-center justify-center overflow-hidden"
               >
-                <img :src="jersey.image" :alt="jersey.name" class="w-full h-full object-contain" />
+                <img :src="jersey.image" :alt="jersey.name" class="w-full h-full object-contain" loading="lazy" />
               </button>
 
               <div class="flex-1 min-w-0">

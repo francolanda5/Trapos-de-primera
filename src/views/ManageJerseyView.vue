@@ -1,14 +1,12 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, watch, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {
-  jerseys,
   createJersey,
   updateJersey,
   deleteJersey,
   getJerseyById
 } from '../store/useStore';
-import { isAdmin, currentUser, loginAsTestAdmin } from '../store/useAuth';
 import type { Jersey } from '../types';
 import ConfirmModal from '../components/ConfirmModal.vue';
 
@@ -18,8 +16,7 @@ const router = useRouter();
 const isEditing = computed(() => !!route.params.id);
 const editingId = computed(() => String(route.params.id || ''));
 
-// Form State with v-model
-const form = reactive<{
+interface JerseyForm {
   name: string;
   team: string;
   customTeam: string;
@@ -33,21 +30,34 @@ const form = reactive<{
   garmentType: Jersey['garmentType'];
   image: string;
   description: string;
-}>({
-  name: '',
-  team: 'Argentina',
-  customTeam: '',
-  category: 'Selección Argentina',
-  era: 'Retro',
-  season: '1986',
-  type: 'Titular',
-  price: 89999,
-  sizeStock: { S: 2, M: 5, L: 3, XL: 0, XXL: 1 },
-  sizes: ['S', 'M', 'L', 'XL', 'XXL'],
-  garmentType: 'Reedición retro',
-  image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAtK7AmERvAeFkoG9fzxTpsSeKt-Fv0_J-rN5DwehqzfP8LyDZbMuc5ogcuw2t-Rd4af6beG1iPzCM11MEQDzCb_zHyhd8X01wkAuQqwwjpOp7A0_gQ5cXPXLSxZ54HVRUYcZc7iMP3nUyYW3RLfEmJ2ExEngkqEmyGy216mzutjTiS6t4sP6T4A9w0RX-qVTIDSmhN9wCJ8UBK8eIQVNv4sWaRaLbJkG0DF7my_J_CIRNVV23HDcLVBw',
-  description: 'Camiseta titular de la Selección Argentina 1986. Reedición retro con el clásico diseño celeste y blanco, emblema AFA y logo Le Coq Sportif. Una camiseta histórica que marcó una época.'
-});
+}
+
+// Valores iniciales del alta: los campos obligatorios arrancan vacíos.
+function emptyForm(): JerseyForm {
+  return {
+    name: '',
+    team: 'Argentina',
+    customTeam: '',
+    category: 'Selección Argentina',
+    era: 'Retro',
+    season: '',
+    type: 'Titular',
+    price: null,
+    sizeStock: { S: 0, M: 0, L: 0, XL: 0, XXL: 0 },
+    sizes: ['S', 'M', 'L', 'XL', 'XXL'],
+    garmentType: 'Reedición retro',
+    image: '',
+    description: ''
+  };
+}
+
+// Estado del formulario, enlazado a los inputs con v-model
+const form = reactive<JerseyForm>(emptyForm());
+
+// Precio máximo: es el tope del filtro de precio del catálogo.
+const MAX_PRICE = 300000;
+// LocalStorage guarda unos 5 MB en total: limitamos las imágenes subidas desde archivo.
+const MAX_IMAGE_BYTES = 1024 * 1024;
 
 // Stock total acumulado computado en tiempo real
 const totalStockComputed = computed(() => {
@@ -66,7 +76,6 @@ const errors = reactive<{
   description?: string;
 }>({});
 
-const isSubmitted = ref(false);
 const saveSuccess = ref(false);
 const showDeleteConfirm = ref(false);
 
@@ -89,7 +98,22 @@ const predefinedTeams = [
   'Otro equipo...'
 ];
 
-onMounted(() => {
+function clearErrors() {
+  errors.name = undefined;
+  errors.team = undefined;
+  errors.season = undefined;
+  errors.price = undefined;
+  errors.stock = undefined;
+  errors.sizes = undefined;
+  errors.image = undefined;
+  errors.description = undefined;
+}
+
+// Carga el formulario según la ruta: vacío en el alta, con datos en la edición.
+function loadForm() {
+  clearErrors();
+  Object.assign(form, emptyForm());
+
   if (isEditing.value) {
     const existing = getJerseyById(editingId.value);
     if (existing) {
@@ -114,18 +138,28 @@ onMounted(() => {
       router.replace('/admin/camisetas');
     }
   }
-});
+}
+
+onMounted(loadForm);
+
+// Alta y edición usan este mismo componente: Vue lo reutiliza al pasar de una ruta
+// a la otra y no vuelve a correr onMounted, por eso se observa el id de la ruta.
+watch(() => route.params.id, loadForm);
+
+// Formato válido de imagen: dirección http(s), ruta local o archivo subido (data:image).
+function isValidImage(value: string): boolean {
+  if (value.startsWith('/') || value.startsWith('data:image/')) return true;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
 
 function validateForm(): boolean {
   let isValid = true;
-  errors.name = undefined;
-  errors.team = undefined;
-  errors.season = undefined;
-  errors.price = undefined;
-  errors.stock = undefined;
-  errors.sizes = undefined;
-  errors.image = undefined;
-  errors.description = undefined;
+  clearErrors();
 
   // 1. Nombre (Obligatorio y longitud mínima)
   if (!form.name || form.name.trim().length === 0) {
@@ -141,20 +175,27 @@ function validateForm(): boolean {
   if (!finalTeam || finalTeam.trim().length === 0) {
     errors.team = 'Debes especificar el equipo o selección.';
     isValid = false;
+  } else if (finalTeam.trim().length < 3) {
+    errors.team = 'El equipo debe tener al menos 3 caracteres.';
+    isValid = false;
   }
 
   // 3. Temporada
   if (!form.season || form.season.trim().length === 0) {
     errors.season = 'La temporada es obligatoria.';
     isValid = false;
-  } else if (!/^\d{4}(\/\d{2})?$/.test(form.season.trim()) && form.season.trim().length < 4) {
+  } else if (!/^\d{4}(\/\d{2})?$/.test(form.season.trim())) {
     errors.season = 'Formato inválido. Ejemplo: 1986 o 2024/25.';
     isValid = false;
   }
 
-  // 4. Precio (Obligatorio, numérico y > 0)
-  if (form.price === null || isNaN(form.price) || form.price <= 0) {
+  // 4. Precio (Obligatorio, numérico, > 0 y dentro del rango del catálogo)
+  // v-model.number deja el valor como texto vacío si el input está vacío: por eso typeof.
+  if (typeof form.price !== 'number' || isNaN(form.price) || form.price <= 0) {
     errors.price = 'El precio debe ser un número mayor a 0.';
+    isValid = false;
+  } else if (form.price > MAX_PRICE) {
+    errors.price = `El precio no puede superar $ ${MAX_PRICE.toLocaleString('es-AR')}.`;
     isValid = false;
   }
 
@@ -167,7 +208,7 @@ function validateForm(): boolean {
   // 6. Stock por talle
   for (const s of form.sizes) {
     const qty = form.sizeStock[s];
-    if (qty === null || qty === undefined || isNaN(qty) || qty < 0) {
+    if (!Number.isInteger(qty) || qty < 0) {
       errors.stock = `El stock del talle ${s} debe ser un número entero mayor o igual a 0.`;
       isValid = false;
       break;
@@ -178,7 +219,7 @@ function validateForm(): boolean {
   if (!form.image || form.image.trim().length === 0) {
     errors.image = 'La imagen es obligatoria.';
     isValid = false;
-  } else if (!form.image.startsWith('http') && !form.image.startsWith('/') && !form.image.startsWith('data:')) {
+  } else if (!isValidImage(form.image.trim())) {
     errors.image = 'Ingresá una URL de imagen válida o subí un archivo.';
     isValid = false;
   }
@@ -196,8 +237,7 @@ function validateForm(): boolean {
 }
 
 function handleSave() {
-  isSubmitted.value = true;
-  if (!validateForm()) return;
+  if (saveSuccess.value || !validateForm()) return; // saveSuccess evita guardar dos veces
 
   const finalTeam = form.team === 'Otro equipo...' ? form.customTeam.trim() : form.team;
 
@@ -207,7 +247,7 @@ function handleSave() {
     cleanSizeStock[s] = Number(form.sizeStock[s] || 0);
   });
 
-  const jerseyData = {
+  const jerseyData: Omit<Jersey, 'id' | 'stock'> = {
     name: form.name.trim(),
     team: finalTeam,
     category: form.category,
@@ -221,7 +261,7 @@ function handleSave() {
     garmentType: form.garmentType,
     image: form.image.trim(),
     description: form.description.trim()
-  } as const;
+  };
 
   if (isEditing.value) {
     updateJersey(editingId.value, jerseyData);
@@ -264,6 +304,11 @@ function handleFileUpload(e: Event) {
   const target = e.target as HTMLInputElement;
   if (target.files && target.files[0]) {
     const file = target.files[0];
+    if (file.size > MAX_IMAGE_BYTES) {
+      errors.image = 'La imagen no puede pesar más de 1 MB. Probá con otra o pegá una URL.';
+      return;
+    }
+    errors.image = undefined;
     const reader = new FileReader();
     reader.onload = (uploadEvent) => {
       if (uploadEvent.target?.result) {
@@ -286,18 +331,10 @@ function handleFileUpload(e: Event) {
       <span class="text-[#0C2333] dark:text-white font-bold">Camisetas</span>
     </nav>
 
-    <!-- Role Notice if not admin -->
-    <div v-if="!isAdmin" class="mb-6 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 p-4 rounded-lg text-amber-900 dark:text-amber-200 text-xs flex items-center justify-between gap-4 flex-wrap">
-      <span>Estás en modo de visualización. Para guardar cambios en catálogo, ingresá con la cuenta de Administrador.</span>
-      <button @click="loginAsTestAdmin" class="px-3 py-1 bg-[#0C2333] dark:bg-[#48B0DA] text-white dark:text-[#0C2333] font-bold rounded cursor-pointer">
-        ⚡ Activar Modo Admin
-      </button>
-    </div>
-
     <!-- Page Title with decorative gold line -->
     <div class="mb-5" data-purpose="page-title-section">
       <div class="flex items-center gap-4">
-        <h1 class="text-2xl md:text-3xl font-condensed font-extrabold text-[#0C2333] dark:text-white tracking-wide uppercase whitespace-nowrap">
+        <h1 class="text-2xl md:text-3xl font-condensed font-extrabold text-[#0C2333] dark:text-white tracking-wide uppercase md:whitespace-nowrap">
           {{ isEditing ? 'EDITAR CAMISETA Y STOCK' : 'GESTIONAR CAMISETA' }}
         </h1>
         <div class="h-[2px] bg-[#D8B15E] flex-1 mt-1"></div>
@@ -351,7 +388,8 @@ function handleFileUpload(e: Event) {
               <select
                 id="shirt-team"
                 v-model="form.team"
-                class="w-full text-xs font-normal bg-white dark:bg-[#081722] border rounded px-3 py-2 text-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#48B0DA] border-[#C8C4B0] dark:border-neutral-600"
+                class="w-full text-xs font-normal bg-white dark:bg-[#081722] border rounded px-3 py-2 text-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#48B0DA]"
+                :class="errors.team ? 'border-red-500' : 'border-[#C8C4B0] dark:border-neutral-600'"
               >
                 <option v-for="t in predefinedTeams" :key="t" :value="t">
                   {{ t }}
@@ -361,6 +399,7 @@ function handleFileUpload(e: Event) {
               <input
                 v-if="form.team === 'Otro equipo...'"
                 v-model="form.customTeam"
+                aria-label="Nombre del club"
                 type="text"
                 placeholder="Escribí el nombre del club"
                 class="w-full text-xs font-normal bg-white dark:bg-[#081722] border border-[#C8C4B0] dark:border-neutral-600 rounded px-3 py-1.5 mt-2 text-slate-700 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#48B0DA]"
@@ -392,9 +431,9 @@ function handleFileUpload(e: Event) {
 
             <!-- Época (4 cols) -->
             <div class="md:col-span-4">
-              <label class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">
+              <span class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">
                 Época *
-              </label>
+              </span>
               <div class="grid grid-cols-2 gap-1.5">
                 <button
                   type="button"
@@ -476,7 +515,7 @@ function handleFileUpload(e: Event) {
 
           <!-- Row 4: GESTIÓN DE EXISTENCIAS INDEPENDIENTES POR TALLE -->
           <div class="p-4 bg-white dark:bg-[#081722] rounded-lg border border-[#C8C4B0] dark:border-neutral-700 space-y-3">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h3 class="text-xs font-bold text-[#0C2333] dark:text-white uppercase tracking-wider">
                   Existencias por Talle *
@@ -491,7 +530,7 @@ function handleFileUpload(e: Event) {
             </div>
 
             <!-- Talles habilitados -->
-            <div class="flex items-center gap-3 text-xs font-medium">
+            <div class="flex flex-wrap items-center gap-3 text-xs font-medium">
               <span class="text-[11px] font-bold text-slate-600 dark:text-slate-300">Talles activos:</span>
               <label v-for="s in ['S', 'M', 'L', 'XL', 'XXL']" :key="s" class="inline-flex items-center gap-1 cursor-pointer">
                 <input
@@ -508,10 +547,11 @@ function handleFileUpload(e: Event) {
             <!-- Inputs independientes de cantidad por talle -->
             <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
               <div v-for="s in form.sizes" :key="s" class="p-2 border border-neutral-200 dark:border-neutral-700 rounded bg-[#F7F4EA] dark:bg-[#112C3F]">
-                <label class="block text-[11px] font-bold text-slate-700 dark:text-neutral-200 mb-1 text-center">
+                <label :for="`stock-${s}`" class="block text-[11px] font-bold text-slate-700 dark:text-neutral-200 mb-1 text-center">
                   Talle {{ s }}
                 </label>
                 <input
+                  :id="`stock-${s}`"
                   v-model.number="form.sizeStock[s]"
                   type="number"
                   min="0"
@@ -544,19 +584,24 @@ function handleFileUpload(e: Event) {
             </div>
 
             <div>
-              <label class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">
+              <span class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">
                 Subir o cambiar imagen *
-              </label>
-              <label class="w-full border border-dashed border-neutral-400 dark:border-neutral-600 rounded py-2 px-3 flex items-center justify-center gap-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-neutral-800 text-xs">
-                <input type="file" accept="image/*" @change="handleFileUpload" class="hidden" />
-                <span>📷 Seleccionar archivo local</span>
+              </span>
+              <!-- sr-only (y no hidden) para que el input se pueda usar con el teclado -->
+              <label class="w-full border border-dashed border-neutral-400 dark:border-neutral-600 rounded py-2 px-3 flex items-center justify-center gap-2 cursor-pointer hover:bg-slate-50 dark:hover:bg-neutral-800 text-xs focus-within:outline-2 focus-within:outline-[#48B0DA]">
+                <input type="file" accept="image/*" @change="handleFileUpload" class="sr-only" />
+                <span>📷 Seleccionar archivo local (máx. 1 MB)</span>
               </label>
             </div>
           </div>
 
           <!-- URL Input Directa -->
           <div>
+            <label class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1" for="shirt-image">
+              O pegá la URL de la imagen
+            </label>
             <input
+              id="shirt-image"
               v-model="form.image"
               type="url"
               placeholder="https://... (URL directa de la imagen)"
@@ -591,7 +636,7 @@ function handleFileUpload(e: Event) {
             <div class="flex items-center gap-3">
               <button
                 type="submit"
-                :disabled="!isAdmin"
+                :disabled="saveSuccess"
                 class="px-5 py-2 bg-[#48B0DA] hover:bg-[#3ca0c9] text-white font-bold text-xs rounded transition-colors shadow-xs cursor-pointer disabled:opacity-50"
               >
                 {{ isEditing ? 'Actualizar camiseta' : 'Guardar camiseta' }}
@@ -608,7 +653,6 @@ function handleFileUpload(e: Event) {
               <button
                 type="button"
                 @click="handleDelete"
-                :disabled="!isAdmin"
                 class="w-full sm:w-auto px-5 py-2 bg-transparent text-[#0C2333] dark:text-neutral-300 font-bold text-xs rounded border border-[#0C2333] dark:border-neutral-600 hover:bg-red-50 hover:text-red-700 hover:border-red-600 transition-colors cursor-pointer disabled:opacity-50"
               >
                 Eliminar camiseta
@@ -619,7 +663,7 @@ function handleFileUpload(e: Event) {
       </section>
 
       <!-- RIGHT COLUMN: Live Product Preview -->
-      <section class="lg:col-span-4 sticky top-28" data-purpose="live-preview-section">
+      <section class="lg:col-span-4 lg:sticky lg:top-44" data-purpose="live-preview-section">
         <div class="flex items-center gap-3 mb-4">
           <h2 class="text-xl font-condensed font-extrabold text-[#0C2333] dark:text-white tracking-wide uppercase whitespace-nowrap">
             VISTA PREVIA
@@ -629,11 +673,11 @@ function handleFileUpload(e: Event) {
 
         <article class="bg-[#F7F4EA] dark:bg-[#112C3F] border border-[#E2DEC9] dark:border-neutral-700 rounded-xl p-5 shadow-xs" data-purpose="product-preview-card">
           <!-- Jersey Image Container -->
-          <div class="w-full rounded-lg overflow-hidden bg-slate-100 dark:bg-[#081722] mb-4 flex items-center justify-center min-h-[200px] max-h-[300px]">
+          <div class="jersey-frame w-full max-w-[240px] mx-auto rounded-lg bg-slate-100 dark:bg-[#081722] mb-4">
             <img
-              :src="form.image || 'https://via.placeholder.com/300x300?text=Sin+Imagen'"
+              :src="form.image || '/sin-imagen.svg'"
               :alt="form.name || 'Vista previa'"
-              class="w-full h-auto object-contain max-h-[280px] p-2"
+              class="jersey-image p-2"
             />
           </div>
 

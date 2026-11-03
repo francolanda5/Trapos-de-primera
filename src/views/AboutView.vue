@@ -11,13 +11,21 @@ const contactForm = reactive({
   message: ''
 });
 
+const contactErrors = reactive<{ name?: string; email?: string; message?: string }>({});
+
 const formSent = ref(false);
 
+// Validación personalizada: obligatorios, longitud mínima y formato de email
+function validateContact(): boolean {
+  contactErrors.name = contactForm.name.trim().length < 3 ? 'Ingresá tu nombre (mínimo 3 caracteres).' : undefined;
+  contactErrors.email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactForm.email) ? undefined : 'Ingresá un email válido.';
+  contactErrors.message = contactForm.message.trim().length < 10 ? 'El mensaje debe tener al menos 10 caracteres.' : undefined;
+  return !contactErrors.name && !contactErrors.email && !contactErrors.message;
+}
+
 function handleContactSubmit() {
-  if (!contactForm.name || !contactForm.email || !contactForm.message) {
-    alert('Por favor completá todos los campos del formulario.');
-    return;
-  }
+  if (!validateContact()) return;
+  // Es una demostración: el mensaje no se envía a ningún servidor.
   formSent.value = true;
   setTimeout(() => {
     contactForm.name = '';
@@ -28,9 +36,8 @@ function handleContactSubmit() {
 }
 
 function filterAscenso(category: string) {
-  filterState.categories = [category];
-  filterState.era = 'Todas';
-  router.push('/catalogo');
+  filterState.search = '';
+  router.push({ path: '/catalogo', query: { categoria: category } });
 }
 </script>
 
@@ -38,10 +45,10 @@ function filterAscenso(category: string) {
   <main class="flex-grow w-full" data-purpose="about-page">
     <!-- Breadcrumb -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 w-full pt-4 pb-2" data-purpose="breadcrumbs">
-      <p class="text-xs font-semibold text-gray-500">
+      <p class="text-xs font-semibold text-gray-500 dark:text-gray-400">
         <router-link to="/" class="text-[#48B0DA] hover:underline">Inicio</router-link>
         <span class="mx-1 text-gray-400">/</span>
-        <span class="text-gray-700">Acerca de</span>
+        <span class="text-gray-700 dark:text-gray-200">Acerca de</span>
       </p>
     </div>
 
@@ -88,7 +95,7 @@ function filterAscenso(category: string) {
     <section class="max-w-7xl mx-auto px-4 sm:px-6 py-12" data-purpose="why-us">
       <!-- Section Header -->
       <div class="flex items-center gap-4 mb-3">
-        <h2 class="font-condensed text-3xl sm:text-4xl font-black tracking-tight text-[#0C2333] dark:text-[#F7F4EA] whitespace-nowrap">
+        <h2 class="font-condensed text-3xl sm:text-4xl font-black tracking-tight text-[#0C2333] dark:text-[#F7F4EA] sm:whitespace-nowrap">
           POR QUÉ TRAPOS DE PRIMERA
         </h2>
         <div class="flex-grow h-[1.5px] bg-[#D8B15E]/70"></div>
@@ -214,7 +221,7 @@ function filterAscenso(category: string) {
     <!-- BEGIN: ContactSection -->
     <section class="max-w-7xl mx-auto px-4 sm:px-6 py-12" data-purpose="contact-form-section">
       <div class="flex items-center gap-4 mb-2">
-        <h2 class="font-condensed text-3xl sm:text-4xl font-black tracking-tight text-[#0C2333] dark:text-[#F7F4EA] whitespace-nowrap">
+        <h2 class="font-condensed text-3xl sm:text-4xl font-black tracking-tight text-[#0C2333] dark:text-[#F7F4EA] sm:whitespace-nowrap">
           HABLEMOS DE CAMISETAS
         </h2>
         <div class="flex-grow h-[1.5px] bg-[#D8B15E]/70"></div>
@@ -231,7 +238,7 @@ function filterAscenso(category: string) {
             ✓ ¡Mensaje enviado con éxito! Nos pondremos en contacto con vos a la brevedad.
           </div>
 
-          <form @submit.prevent="handleContactSubmit" class="space-y-4">
+          <form @submit.prevent="handleContactSubmit" class="space-y-4" novalidate>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="sr-only" for="name-input">Nombre</label>
@@ -240,9 +247,9 @@ function filterAscenso(category: string) {
                   v-model="contactForm.name"
                   class="w-full bg-[#f2eee3] dark:bg-slate-800 border border-[#d8d2c2] dark:border-slate-700 rounded px-4 py-2.5 text-sm text-[#0C2333] dark:text-slate-100 focus:ring-2 focus:ring-[#48B0DA] outline-none placeholder:text-gray-500 dark:placeholder:text-gray-400"
                   placeholder="Nombre"
-                  required
                   type="text"
                 />
+                <p v-if="contactErrors.name" class="text-[11px] text-red-500 font-semibold mt-1">{{ contactErrors.name }}</p>
               </div>
               <div>
                 <label class="sr-only" for="email-input">Email</label>
@@ -251,9 +258,9 @@ function filterAscenso(category: string) {
                   v-model="contactForm.email"
                   class="w-full bg-[#f2eee3] dark:bg-slate-800 border border-[#d8d2c2] dark:border-slate-700 rounded px-4 py-2.5 text-sm text-[#0C2333] dark:text-slate-100 focus:ring-2 focus:ring-[#48B0DA] outline-none placeholder:text-gray-500 dark:placeholder:text-gray-400"
                   placeholder="Email"
-                  required
                   type="email"
                 />
+                <p v-if="contactErrors.email" class="text-[11px] text-red-500 font-semibold mt-1">{{ contactErrors.email }}</p>
               </div>
             </div>
 
@@ -264,9 +271,9 @@ function filterAscenso(category: string) {
                 v-model="contactForm.message"
                 class="w-full bg-[#f2eee3] dark:bg-slate-800 border border-[#d8d2c2] dark:border-slate-700 rounded px-4 py-2.5 text-sm text-[#0C2333] dark:text-slate-100 focus:ring-2 focus:ring-[#48B0DA] outline-none placeholder:text-gray-500 dark:placeholder:text-gray-400 resize-y"
                 placeholder="Mensaje"
-                required
                 rows="5"
               ></textarea>
+              <p v-if="contactErrors.message" class="text-[11px] text-red-500 font-semibold mt-1">{{ contactErrors.message }}</p>
             </div>
 
             <button

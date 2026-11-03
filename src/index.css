@@ -1,6 +1,16 @@
 @import "tailwindcss";
 
+/* Tailwind v4 usa por defecto la preferencia del sistema para dark:.
+   Con esto, dark: depende de la clase .dark que el botón de tema pone en <html>. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
+  /* Foco visible para quien navega con teclado */
+  :focus-visible {
+    outline: 2px solid #48B0DA;
+    outline-offset: 2px;
+  }
+
   body {
     background-color: #F7F4EA;
     color: #0C2333;
@@ -34,6 +44,59 @@
   font-family: 'Montserrat', 'Oswald', sans-serif;
 }
 
+/* Pantallas táctiles (celular y tablet):
+   - Botones, campos y opciones de al menos 44 px, para tocarlos sin errar.
+   - Campos con letra de 16 px: con menos, iOS hace zoom al enfocarlos. */
+@media (max-width: 1023px) {
+  button,
+  select,
+  textarea,
+  input:not([type='checkbox'], [type='radio'], [type='file']) {
+    min-height: 44px;
+  }
+
+  button {
+    min-width: 44px;
+  }
+
+  select,
+  textarea,
+  input:not([type='checkbox'], [type='radio'], [type='file'], [type='range']) {
+    font-size: 16px;
+  }
+
+  label:has(> input[type='checkbox']),
+  label:has(> input[type='radio']) {
+    min-height: 44px;
+  }
+
+  /* min-height no afecta a los enlaces dentro de una línea de texto, que quedan igual */
+  a {
+    min-height: 44px;
+    align-content: center;
+  }
+
+  footer li a {
+    display: block;
+  }
+}
+
+/* Marco único para las camisetas: misma proporción (4:5) en toda la app.
+   object-fit: contain muestra la camiseta entera, sin recortarla, sea cual sea la foto. */
+.jersey-frame {
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.jersey-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 /* Custom TDP Crest Styling */
 .tdp-badge {
   position: relative;
@@ -55,6 +118,17 @@
 }
 
 /* Vue Route Transitions */
+/* Galería del detalle: fundido entre vistas */
+.gallery-fade-enter-active,
+.gallery-fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+
+.gallery-fade-enter-from,
+.gallery-fade-leave-to {
+  opacity: 0;
+}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.2s ease, transform 0.2s ease;
@@ -80,6 +154,31 @@
 
 .list-move {
   transition: transform 0.3s ease;
+}
+
+/* Botón "volver arriba": entra con fade + slide + scale */
+.scroll-top-enter-active,
+.scroll-top-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.scroll-top-enter-from,
+.scroll-top-leave-to {
+  opacity: 0;
+  transform: translateY(12px) scale(0.8);
+}
+
+/* Quien pidió reducir el movimiento lo ve aparecer sin desplazamiento */
+@media (prefers-reduced-motion: reduce) {
+  .scroll-top-enter-active,
+  .scroll-top-leave-active {
+    transition: opacity 0.01s linear;
+  }
+
+  .scroll-top-enter-from,
+  .scroll-top-leave-to {
+    transform: none;
+  }
 }
 
 /* Modal and Drawer Transitions */

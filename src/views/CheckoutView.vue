@@ -88,8 +88,9 @@ function validateStep2(): boolean {
     errors.buyerEmail = 'Ingresá un correo electrónico válido.';
     valid = false;
   }
-  if (!buyer.phone.trim() || buyer.phone.length < 8) {
-    errors.buyerPhone = 'Ingresá un teléfono de contacto válido.';
+  // Formato: opcional + al inicio, y al menos 8 caracteres entre dígitos, espacios, guiones o paréntesis
+  if (!/^\+?[\d\s()-]{8,}$/.test(buyer.phone.trim())) {
+    errors.buyerPhone = 'Ingresá un teléfono válido (solo números, mínimo 8 dígitos).';
     valid = false;
   }
 
@@ -234,7 +235,7 @@ function formatPrice(val: number): string {
     <!-- 5-Step Checkout Container -->
     <div v-else>
       <!-- Stepper Header -->
-      <div class="grid grid-cols-4 gap-2 mb-8 text-center text-xs font-bold">
+      <div class="grid grid-cols-5 gap-1 sm:gap-2 mb-8 text-center text-[10px] sm:text-xs font-bold">
         <div
           class="py-2 border-b-2 transition-colors"
           :class="currentStep >= 1 ? 'border-[#48B0DA] text-[#48B0DA]' : 'border-neutral-300 text-slate-400'"
@@ -258,6 +259,12 @@ function formatPrice(val: number): string {
           :class="currentStep >= 4 ? 'border-[#48B0DA] text-[#48B0DA]' : 'border-neutral-300 text-slate-400'"
         >
           4. Pago
+        </div>
+        <div
+          class="py-2 border-b-2 transition-colors"
+          :class="currentStep >= 5 ? 'border-[#48B0DA] text-[#48B0DA]' : 'border-neutral-300 text-slate-400'"
+        >
+          5. Confirmar
         </div>
       </div>
 
@@ -283,10 +290,11 @@ function formatPrice(val: number): string {
           <div
             v-for="item in cart"
             :key="item.id"
-            class="flex items-center gap-4 p-3 bg-[#F7F4EA] dark:bg-[#081722] rounded-lg border border-neutral-200 dark:border-neutral-700"
+            class="flex flex-wrap sm:flex-nowrap items-center gap-x-4 gap-y-2 p-3 bg-[#F7F4EA] dark:bg-[#081722] rounded-lg border border-neutral-200 dark:border-neutral-700"
           >
-            <img :src="item.jersey.image" :alt="item.jersey.name" class="w-16 h-16 object-contain rounded" />
-            <div class="flex-1 min-w-0">
+            <img :src="item.jersey.image" :alt="item.jersey.name" class="w-16 h-16 object-contain rounded shrink-0" loading="lazy" />
+            <!-- En celular el texto ocupa la fila junto a la imagen, y los controles bajan a la siguiente -->
+            <div class="flex-1 min-w-[calc(100%-5rem)] sm:min-w-0">
               <h3 class="font-bold text-sm text-[#0C2333] dark:text-white truncate">{{ item.jersey.name }}</h3>
               <p class="text-xs text-slate-500 dark:text-slate-400">
                 Talle: <span class="font-bold text-[#0C2333] dark:text-[#48B0DA]">{{ item.size }}</span> · Stock disponible: {{ item.jersey.sizeStock[item.size] }}
@@ -300,14 +308,16 @@ function formatPrice(val: number): string {
             <div class="flex items-center gap-1 border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-[#112C3F] overflow-hidden">
               <button
                 @click="updateCartQuantity(item.id, -1)"
-                class="px-2 py-1 text-xs text-slate-600 dark:text-slate-200 hover:bg-neutral-100 cursor-pointer"
+                aria-label="Restar una unidad"
+                class="px-2 py-1 text-xs text-slate-600 dark:text-slate-200 hover:bg-neutral-100 dark:hover:bg-neutral-700 cursor-pointer"
               >
                 -
               </button>
               <span class="px-2 text-xs font-bold">{{ item.quantity }}</span>
               <button
                 @click="updateCartQuantity(item.id, 1)"
-                class="px-2 py-1 text-xs text-slate-600 dark:text-slate-200 hover:bg-neutral-100 cursor-pointer"
+                aria-label="Sumar una unidad"
+                class="px-2 py-1 text-xs text-slate-600 dark:text-slate-200 hover:bg-neutral-100 dark:hover:bg-neutral-700 cursor-pointer"
               >
                 +
               </button>
@@ -315,6 +325,7 @@ function formatPrice(val: number): string {
 
             <button
               @click="removeFromCart(item.id)"
+              aria-label="Quitar del carrito"
               class="text-xs text-red-500 hover:underline p-1 cursor-pointer"
             >
               ✕
@@ -345,8 +356,9 @@ function formatPrice(val: number): string {
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">Nombre *</label>
+            <label for="buyer-name" class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">Nombre *</label>
             <input
+              id="buyer-name"
               v-model="buyer.name"
               type="text"
               class="w-full text-xs bg-[#F7F4EA] dark:bg-[#081722] border rounded px-3 py-2 text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#48B0DA]"
@@ -356,8 +368,9 @@ function formatPrice(val: number): string {
           </div>
 
           <div>
-            <label class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">Apellido *</label>
+            <label for="buyer-lastname" class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">Apellido *</label>
             <input
+              id="buyer-lastname"
               v-model="buyer.lastName"
               type="text"
               class="w-full text-xs bg-[#F7F4EA] dark:bg-[#081722] border rounded px-3 py-2 text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#48B0DA]"
@@ -367,8 +380,9 @@ function formatPrice(val: number): string {
           </div>
 
           <div>
-            <label class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">Correo Electrónico *</label>
+            <label for="buyer-email" class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">Correo Electrónico *</label>
             <input
+              id="buyer-email"
               v-model="buyer.email"
               type="email"
               class="w-full text-xs bg-[#F7F4EA] dark:bg-[#081722] border rounded px-3 py-2 text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#48B0DA]"
@@ -378,8 +392,9 @@ function formatPrice(val: number): string {
           </div>
 
           <div>
-            <label class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">Teléfono / WhatsApp *</label>
+            <label for="buyer-phone" class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">Teléfono / WhatsApp *</label>
             <input
+              id="buyer-phone"
               v-model="buyer.phone"
               type="tel"
               placeholder="+54 11 ..."
@@ -439,8 +454,9 @@ function formatPrice(val: number): string {
         <!-- Campos de dirección si es envío a domicilio -->
         <div v-if="deliveryMethod === 'shipping'" class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
           <div class="sm:col-span-2">
-            <label class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">Calle y Altura *</label>
+            <label for="buyer-address" class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">Calle y Altura *</label>
             <input
+              id="buyer-address"
               v-model="buyer.address"
               type="text"
               placeholder="Ej: Av. San Martín 450, Piso 2"
@@ -451,8 +467,9 @@ function formatPrice(val: number): string {
           </div>
 
           <div>
-            <label class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">Código Postal *</label>
+            <label for="buyer-postal" class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">Código Postal *</label>
             <input
+              id="buyer-postal"
               v-model="buyer.postalCode"
               type="text"
               class="w-full text-xs bg-[#F7F4EA] dark:bg-[#081722] border rounded px-3 py-2 text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#48B0DA]"
@@ -462,8 +479,9 @@ function formatPrice(val: number): string {
           </div>
 
           <div class="sm:col-span-3">
-            <label class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">Ciudad / Provincia *</label>
+            <label for="buyer-city" class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">Ciudad / Provincia *</label>
             <input
+              id="buyer-city"
               v-model="buyer.city"
               type="text"
               class="w-full text-xs bg-[#F7F4EA] dark:bg-[#081722] border rounded px-3 py-2 text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#48B0DA]"

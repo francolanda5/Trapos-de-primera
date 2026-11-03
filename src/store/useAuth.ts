@@ -1,15 +1,16 @@
 import { ref, computed, watch } from 'vue';
 import type { User } from '../types';
-import { parseJwt, type GoogleUserPayload } from '../services/googleAuthService';
+import { parseJwt } from '../services/googleAuthService';
 
 const STORAGE_KEYS = {
   CURRENT_USER: 'tdp_current_user_v1',
-  USERS: 'tdp_users_v1'
+  USERS: 'tdp_users_v2'
 };
 
 /**
- * Función criptográfica para hash de contraseñas (SHA-256 con salt)
- * Evita almacenar contraseñas en texto plano en LocalStorage
+ * Hash de contraseñas (SHA-256 con salt) para no guardarlas en texto plano en LocalStorage.
+ * Ojo: todo corre en el navegador, así que es una simulación didáctica de login,
+ * no seguridad real. Una app real validaría en un servidor.
  */
 export async function hashPassword(plain: string): Promise<string> {
   const enc = new TextEncoder().encode(plain + '_tdp_salt_2026');
@@ -26,7 +27,7 @@ const INITIAL_USERS: User[] = [
     name: 'Facundo Romero (Admin)',
     email: 'admin@traposdeprimera.com',
     role: 'admin',
-    passwordHash: 'e69888d30e3dd82c3c1788734267ca629393a653bb9640498b3f27b9a5c888d2', // admin123
+    passwordHash: 'c720631e1f7349eedf6a0b7506007beb11c1af84c3e2d2449ad4bc5ded224ea9', // admin123
     createdAt: new Date().toISOString()
   },
   {
@@ -34,7 +35,7 @@ const INITIAL_USERS: User[] = [
     name: 'Franco Fusco (Cliente)',
     email: 'franco@gmail.com',
     role: 'customer',
-    passwordHash: '8cb2237d0679ca88db6464eac60da963455139649b864e6b6694602bb166b2ef', // cliente123
+    passwordHash: '09afc18e18b61d2a192313f6dceb9be8b65a376134cf8d8c3b17f46d0715f050', // cliente123
     createdAt: new Date().toISOString()
   }
 ];
@@ -52,11 +53,13 @@ function loadStoredUsers(): User[] {
   return [...INITIAL_USERS];
 }
 
-function loadStoredSession(): User | null {
+// La sesión guardada solo vale si el usuario existe; el rol siempre sale de su cuenta.
+function loadStoredSession(users: User[]): User | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
     if (raw) {
-      return JSON.parse(raw);
+      const stored = JSON.parse(raw);
+      return users.find((u) => u.id === stored?.id) ?? null;
     }
   } catch (e) {
     console.error('Error al leer sesión de LocalStorage:', e);
@@ -65,9 +68,17 @@ function loadStoredSession(): User | null {
 }
 
 export const registeredUsers = ref<User[]>(loadStoredUsers());
-export const currentUser = ref<User | null>(loadStoredSession());
+export const currentUser = ref<User | null>(loadStoredSession(registeredUsers.value));
 export const isAuthModalOpen = ref<boolean>(false);
 export const authModalMode = ref<'login' | 'register'>('login');
+export const authModalMessage = ref<string>('');
+
+// Abre el modal de login, opcionalmente explicando por qué se pide iniciar sesión.
+export function openLoginModal(message = '') {
+  authModalMode.value = 'login';
+  authModalMessage.value = message;
+  isAuthModalOpen.value = true;
+}
 
 watch(
   registeredUsers,
@@ -148,7 +159,8 @@ export async function registerWithEmail(name: string, email: string, password: s
 
 /**
  * Inicio de sesión mediante Google Identity (GIS)
- * Diferencia autenticación de autorización: el usuario de Google recibe rol 'customer'
+ * Diferencia autenticación de autorización: Google dice quién es la persona,
+ * pero por Google solo se entra como cliente. Nunca como administrador.
  */
 export function loginWithGoogleCredential(credentialToken: string): { success: boolean; error?: string } {
   const payload = parseJwt(credentialToken);
@@ -157,6 +169,11 @@ export function loginWithGoogleCredential(credentialToken: string): { success: b
   }
 
   let user = registeredUsers.value.find((u) => u.email.toLowerCase() === payload.email.toLowerCase());
+
+  // Una cuenta de Google con el mismo mail que un admin no hereda ese rol.
+  if (user?.role === 'admin') {
+    return { success: false, error: 'Las cuentas de administrador no pueden ingresar con Google.' };
+  }
 
   if (!user) {
     // Si no existía, se crea como cliente
@@ -184,14 +201,6 @@ export function loginWithGoogleCredential(credentialToken: string): { success: b
  */
 export function logout() {
   currentUser.value = null;
-}
-
-/**
- * Selector rápido de rol (para pruebas de la consigna entre Administrador y Cliente)
- */
-export function toggleUserRole() {
-  if (!currentUser.value) return;
-  currentUser.value.role = currentUser.value.role === 'admin' ? 'customer' : 'admin';
 }
 
 /**

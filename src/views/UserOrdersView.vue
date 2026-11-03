@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { orders } from '../store/useStore';
-import { currentUser, isAuthenticated, isAuthModalOpen } from '../store/useAuth';
+import { currentUser } from '../store/useAuth';
 
+// Cada cuenta ve solo sus pedidos. Se filtra por userId y no por el email del comprador,
+// que es un dato que se puede escribir a mano en el checkout.
 const userOrders = computed(() => {
   if (!currentUser.value) return [];
-  return orders.value.filter(
-    (o) => o.userId === currentUser.value?.id || o.buyer.email.toLowerCase() === currentUser.value?.email.toLowerCase()
-  );
+  return orders.value.filter((o) => o.userId === currentUser.value?.id);
 });
 
 function formatDate(iso: string): string {
@@ -52,29 +52,9 @@ function formatPrice(val: number): string {
       </p>
     </div>
 
-    <!-- Si no está autenticado -->
+    <!-- Sin pedidos (a esta ruta solo se llega con sesión iniciada: ver el guard del router) -->
     <div
-      v-if="!isAuthenticated"
-      class="bg-white dark:bg-[#112C3F] border border-neutral-200 dark:border-neutral-700 rounded-xl p-8 text-center shadow-xs"
-    >
-      <div class="text-4xl mb-3">👤</div>
-      <h2 class="font-condensed text-xl font-bold uppercase text-[#0C2333] dark:text-white">
-        Iniciá sesión para ver tus pedidos
-      </h2>
-      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-4">
-        Ingresá con tu correo o con Google para consultar tu historial de compras.
-      </p>
-      <button
-        @click="isAuthModalOpen = true"
-        class="px-5 py-2.5 bg-[#48B0DA] text-white font-bold text-xs uppercase tracking-wider rounded transition-colors shadow-xs cursor-pointer"
-      >
-        Iniciar sesión →
-      </button>
-    </div>
-
-    <!-- Si está autenticado pero no tiene pedidos -->
-    <div
-      v-else-if="userOrders.length === 0"
+      v-if="userOrders.length === 0"
       class="bg-white dark:bg-[#112C3F] border border-neutral-200 dark:border-neutral-700 rounded-xl p-8 text-center shadow-xs"
     >
       <div class="text-4xl mb-3">📦</div>
@@ -128,7 +108,7 @@ function formatPrice(val: number): string {
             :key="idx"
             class="flex items-center gap-3 p-2 bg-[#F7F4EA] dark:bg-[#081722] rounded border border-neutral-200 dark:border-neutral-800"
           >
-            <img :src="item.image" :alt="item.name" class="w-12 h-12 object-contain" />
+            <img :src="item.image" :alt="item.name" class="w-12 h-12 object-contain" loading="lazy" />
             <div class="flex-1 min-w-0">
               <p class="font-bold text-slate-800 dark:text-white truncate">{{ item.name }}</p>
               <p class="text-slate-500 dark:text-slate-400">

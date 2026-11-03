@@ -8,7 +8,7 @@ import {
   isFavoritesOpen,
   liveAnnouncement,
   filterState,
-  apiSyncState,
+  dolarStatus,
   theme,
   toggleTheme
 } from '../store/useStore';
@@ -18,9 +18,9 @@ import {
   isAdmin,
   isAuthModalOpen,
   authModalMode,
-  logout,
-  toggleUserRole
+  logout
 } from '../store/useAuth';
+import SearchBar from './SearchBar.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -37,26 +37,10 @@ function onSearch() {
   }
 }
 
-function filterBy(category?: string, era?: 'Actual' | 'Retro') {
-  if (category) {
-    if (category === 'Ascenso') {
-      filterState.categories = ['Primera Nacional', 'Primera B Metropolitana'];
-      router.push({ path: '/catalogo', query: { categoria: 'Ascenso' } });
-    } else {
-      filterState.categories = [category];
-      router.push({ path: '/catalogo', query: { categoria: category } });
-    }
-    filterState.era = 'Todas';
-  } else if (era) {
-    filterState.categories = [];
-    filterState.era = era;
-    router.push({ path: '/catalogo', query: { era } });
-  } else {
-    filterState.categories = [];
-    filterState.era = 'Todas';
-    router.push('/catalogo');
-  }
-  filterState.decade = 'Todas las épocas';
+// Al elegir una sección se limpia la búsqueda. Los demás filtros viajan en la URL
+// y los aplica CatalogView al leer route.query.
+function clearSearch() {
+  localSearch.value = '';
   filterState.search = '';
 }
 
@@ -83,7 +67,8 @@ function handleLogout() {
 </script>
 
 <template>
-  <header class="w-full sticky top-0 z-40 bg-[#F7F4EA] dark:bg-[#0C2333] transition-colors" data-purpose="site-header">
+  <!-- Fijo arriba solo desde tablet: en celular ocuparía demasiada pantalla -->
+  <header class="w-full sm:sticky sm:top-0 z-40 bg-[#F7F4EA] dark:bg-[#0C2333] transition-colors" data-purpose="site-header">
     <!-- Top Notification Bar -->
     <div class="bg-[#0C2333] dark:bg-[#081722] text-white text-[11px] sm:text-xs py-2 px-4 border-b border-[#13354d] dark:border-neutral-800">
       <div class="max-w-7xl mx-auto flex items-center justify-between gap-2 sm:gap-6 font-medium tracking-wide flex-wrap">
@@ -97,10 +82,10 @@ function handleLogout() {
 
         <!-- Right Side: API Status, Theme Toggle -->
         <div class="flex items-center gap-3 sm:gap-4 text-white/80 text-[11px] mx-auto sm:mx-0">
-          <!-- API Sync Indicator -->
+          <!-- Estado real del fetch a DolarAPI -->
           <span class="hidden md:flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full" :class="apiSyncState.status === 'success' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'"></span>
-            <span>API: {{ apiSyncState.status === 'success' ? 'Supabase Conectado' : 'Persistencia Local' }}</span>
+            <span class="w-2 h-2 rounded-full" :class="dolarStatus === 'ok' ? 'bg-emerald-400' : 'bg-amber-400'"></span>
+            <span>Cotización: {{ dolarStatus === 'ok' ? 'en vivo' : dolarStatus === 'error' ? 'no disponible' : 'cargando...' }}</span>
           </span>
 
           <span class="hidden md:inline text-white/30">|</span>
@@ -121,7 +106,7 @@ function handleLogout() {
     <!-- Main Header -->
     <div class="border-b border-neutral-300/60 dark:border-neutral-800 bg-[#F7F4EA] dark:bg-[#0C2333]">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-        <div class="flex items-center justify-between gap-4">
+        <div class="flex flex-wrap sm:flex-nowrap items-center justify-between gap-x-4 gap-y-2">
           <!-- TDP Logo (Moderadamente aumentado, proporcional y optimizado para móvil) -->
           <router-link to="/" class="flex items-center hover:scale-[1.02] transition-transform py-1 shrink-0" title="Trapos de Primera">
             <img
@@ -131,21 +116,9 @@ function handleLogout() {
             />
           </router-link>
 
-          <!-- Search Bar -->
-          <div class="flex-1 max-w-xl mx-2 sm:mx-6">
-            <form @submit.prevent="onSearch" class="relative">
-              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path>
-                </svg>
-              </span>
-              <input
-                v-model="localSearch"
-                class="w-full pl-10 pr-4 py-2 bg-white/90 dark:bg-[#112C3F] rounded-md border border-neutral-300 dark:border-neutral-600 text-xs sm:text-sm text-slate-800 dark:text-neutral-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#48B0DA] focus:border-transparent transition-all shadow-xs"
-                placeholder="Buscar camisetas, equipos, temporadas..."
-                type="text"
-              />
-            </form>
+          <!-- Search Bar: en celular ocupa una fila propia debajo del logo y los íconos -->
+          <div class="order-last sm:order-none w-full sm:w-auto sm:flex-1 max-w-xl sm:mx-6">
+            <SearchBar v-model="localSearch" @search="onSearch" />
           </div>
 
           <!-- Action Icons (Auth, Favorites, Cart) -->
@@ -171,16 +144,18 @@ function handleLogout() {
             <div v-else class="relative">
               <button
                 @click="isUserMenuOpen = !isUserMenuOpen"
+                :aria-expanded="isUserMenuOpen"
+                aria-label="Menú de usuario"
                 class="flex items-center gap-2 px-2.5 py-1 rounded bg-white/60 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 hover:border-[#48B0DA] transition-all cursor-pointer"
               >
                 <div class="w-6 h-6 rounded-full bg-[#48B0DA] text-white text-xs font-bold flex items-center justify-center overflow-hidden">
                   <img v-if="currentUser?.avatarUrl" :src="currentUser.avatarUrl" :alt="currentUser.name" class="w-full h-full object-cover" />
                   <span v-else>{{ currentUser?.name.charAt(0).toUpperCase() }}</span>
                 </div>
-                <span class="text-xs font-bold text-[#0C2333] dark:text-white truncate max-w-[90px] sm:max-w-[120px]">
+                <span class="hidden sm:inline text-xs font-bold text-[#0C2333] dark:text-white truncate max-w-[120px]">
                   {{ currentUser?.name.split(' ')[0] }}
                 </span>
-                <span class="text-[9px] px-1 py-0.2 rounded font-mono font-bold uppercase" :class="isAdmin ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300'">
+                <span class="hidden sm:inline text-[9px] px-1 py-0.2 rounded font-mono font-bold uppercase" :class="isAdmin ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300'">
                   {{ currentUser?.role }}
                 </span>
               </button>
@@ -221,14 +196,6 @@ function handleLogout() {
                   👕 Gestionar Camisetas
                 </router-link>
 
-                <button
-                  type="button"
-                  @click="toggleUserRole"
-                  class="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-[11px] text-amber-600 dark:text-amber-400 transition-colors cursor-pointer"
-                >
-                  ⇄ Cambiar a rol: {{ currentUser?.role === 'admin' ? 'Cliente' : 'Admin' }}
-                </button>
-
                 <div class="border-t border-neutral-200 dark:border-neutral-700 my-1"></div>
 
                 <button
@@ -247,14 +214,16 @@ function handleLogout() {
               @click="openAuth('login')"
               class="sm:hidden p-1 hover:text-[#48B0DA] transition-colors cursor-pointer"
               title="Cuenta"
+              aria-label="Iniciar sesión"
             >
               <svg class="w-6 h-6 stroke-current fill-none" stroke-width="1.8" viewBox="0 0 24 24">
                 <path d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" stroke-linecap="round" stroke-linejoin="round"></path>
               </svg>
             </button>
 
-            <!-- Favoritos Button (Opens Drawer) -->
+            <!-- Favoritos: solo con sesión iniciada -->
             <button
+              v-if="isAuthenticated"
               @click="isFavoritesOpen = true"
               aria-label="Ver favoritos"
               class="hover:text-[#48B0DA] transition-colors relative p-1 cursor-pointer"
@@ -306,58 +275,58 @@ function handleLogout() {
           <span class="text-slate-300 dark:text-slate-600">|</span>
 
           <!-- Primera -->
-          <a
-            href="#"
-            @click.prevent="filterBy('Primera División')"
+          <router-link
+            :to="{ path: '/catalogo', query: { categoria: 'Primera División' } }"
+            @click="clearSearch"
             class="transition-colors hover:text-[#48B0DA]"
             :class="isPrimeraActive ? 'text-[#48B0DA] border-b-2 border-[#48B0DA] pb-0.5' : ''"
           >
             Primera
-          </a>
+          </router-link>
           <span class="text-slate-300 dark:text-slate-600">|</span>
 
           <!-- Ascenso -->
-          <a
-            href="#"
-            @click.prevent="filterBy('Ascenso')"
+          <router-link
+            :to="{ path: '/catalogo', query: { categoria: 'Ascenso' } }"
+            @click="clearSearch"
             class="transition-colors hover:text-[#48B0DA]"
             :class="isAscensoActive ? 'text-[#48B0DA] border-b-2 border-[#48B0DA] pb-0.5' : ''"
           >
             Ascenso
-          </a>
+          </router-link>
           <span class="text-slate-300 dark:text-slate-600">|</span>
 
           <!-- Selección -->
-          <a
-            href="#"
-            @click.prevent="filterBy('Selección Argentina')"
+          <router-link
+            :to="{ path: '/catalogo', query: { categoria: 'Selección Argentina' } }"
+            @click="clearSearch"
             class="transition-colors hover:text-[#48B0DA]"
             :class="isSeleccionActive ? 'text-[#48B0DA] border-b-2 border-[#48B0DA] pb-0.5' : ''"
           >
             Selección
-          </a>
+          </router-link>
           <span class="text-slate-300 dark:text-slate-600">|</span>
 
           <!-- Retro -->
-          <a
-            href="#"
-            @click.prevent="filterBy(undefined, 'Retro')"
+          <router-link
+            :to="{ path: '/catalogo', query: { era: 'Retro' } }"
+            @click="clearSearch"
             class="transition-colors hover:text-[#48B0DA]"
             :class="isRetroActive ? 'text-[#48B0DA] border-b-2 border-[#48B0DA] pb-0.5' : ''"
           >
             Retro
-          </a>
+          </router-link>
           <span class="text-slate-300 dark:text-slate-600">|</span>
 
           <!-- Actuales -->
-          <a
-            href="#"
-            @click.prevent="filterBy(undefined, 'Actual')"
+          <router-link
+            :to="{ path: '/catalogo', query: { era: 'Actual' } }"
+            @click="clearSearch"
             class="transition-colors hover:text-[#48B0DA]"
             :class="isActualesActive ? 'text-[#48B0DA] border-b-2 border-[#48B0DA] pb-0.5' : ''"
           >
             Actuales
-          </a>
+          </router-link>
           <span class="text-slate-300 dark:text-slate-600">|</span>
 
           <!-- Acerca de -->

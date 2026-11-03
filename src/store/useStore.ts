@@ -1,8 +1,9 @@
 import { reactive, ref, computed, watch } from 'vue';
 import type { Jersey, CartItem, FilterState, Order, OrderStatus, BuyerInfo, PaymentMethod, DeliveryMethod } from '../types';
 import { INITIAL_JERSEYS } from '../data/initialJerseys';
-import { supabaseService, type RemoteSyncStatus } from '../services/supabaseService';
-import { currentUser } from './useAuth';
+import { getGeneratedImages, isLegacyPhoto, upgradeJerseyImages } from '../data/jerseyImages';
+import { fetchDolarQuotes } from '../services/apiService';
+import { currentUser, openLoginModal } from './useAuth';
 
 const STORAGE_KEYS = {
   JERSEYS: 'tdp_jerseys_v2',
@@ -31,9 +32,10 @@ function migrateAndLoadJerseys(): Jersey[] {
             });
             j.sizeStock = sizeStock;
           }
+          if (!Array.isArray(j.sizes)) j.sizes = Object.keys(j.sizeStock);
           // Stock total = suma de talles
           j.stock = Object.values(j.sizeStock as Record<string, number>).reduce((a, b) => a + Number(b || 0), 0);
-          return j as Jersey;
+          return upgradeJerseyImages(j as Jersey);
         });
       }
     }
@@ -48,7 +50,12 @@ function loadStoredCart(): CartItem[] {
     const raw = localStorage.getItem(STORAGE_KEYS.CART);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      // Se descartan ítems viejos o dañados para que no rompan la app
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((item) => item?.jersey?.id && item.size)
+          .map((item) => ({ ...item, jersey: upgradeJerseyImages(item.jersey) })); // el carrito guarda una copia de la camiseta
+      }
     }
   } catch (e) {
     console.error('Error al leer LocalStorage cart:', e);
@@ -61,20 +68,31 @@ function loadStoredOrders(): Order[] {
     const raw = localStorage.getItem(STORAGE_KEYS.ORDERS);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      // Se descartan pedidos viejos o dañados para que no rompan la app
+      if (Array.isArray(parsed)) {
+        const valid: Order[] = parsed.filter((o) => o?.id && o.buyer && Array.isArray(o.items));
+        // Cada ítem guarda su imagen: si es una foto del catálogo anterior, pasa a la nueva.
+        valid.forEach((order) => {
+          order.items.forEach((item) => {
+            const generated = getGeneratedImages(item.jerseyId);
+            if (generated && isLegacyPhoto(item.image)) item.image = generated.image;
+          });
+        });
+        return valid;
+      }
     }
   } catch (e) {
     console.error('Error al leer pedidos de LocalStorage:', e);
   }
-  // Pedido inicial de demostración para el panel de administración
+  // Pedido de demostración: pertenece a la cuenta de prueba cliente (franco@gmail.com)
   return [
     {
       id: 'TDP-2026-1042',
       createdAt: new Date(Date.now() - 3600000 * 24).toISOString(),
       buyer: {
-        name: 'Matías',
-        lastName: 'Gallardo',
-        email: 'matias.gallardo@gmail.com',
+        name: 'Franco',
+        lastName: 'Fusco',
+        email: 'franco@gmail.com',
         phone: '+54 11 4455-6677',
         address: 'Av. Corrientes 1234, 4B',
         city: 'CABA',
@@ -92,7 +110,7 @@ function loadStoredOrders(): Order[] {
           size: 'M',
           quantity: 1,
           unitPrice: 89999,
-          image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAtK7AmERvAeFkoG9fzxTpsSeKt-Fv0_J-rN5DwehqzfP8LyDZbMuc5ogcuw2t-Rd4af6beG1iPzCM11MEQDzCb_zHyhd8X01wkAuQqwwjpOp7A0_gQ5cXPXLSxZ54HVRUYcZc7iMP3nUyYW3RLfEmJ2ExEngkqEmyGy216mzutjTiS6t4sP6T4A9w0RX-qVTIDSmhN9wCJ8UBK8eIQVNv4sWaRaLbJkG0DF7my_J_CIRNVV23HDcLVBw'
+          image: '/assets/jerseys/arg-1986-frente.webp'
         }
       ],
       subtotal: 89999,
@@ -113,24 +131,29 @@ function loadStoredTheme(): 'light' | 'dark' {
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
+// Cada cuenta tiene sus favoritos en su propia clave. Un invitado no tiene favoritos.
 function loadStoredFavorites(userId?: string): string[] {
+  if (!userId) return [];
   try {
-    const key = `${STORAGE_KEYS.FAVORITES}_${userId || 'guest'}`;
-    const raw = localStorage.getItem(key);
+    const raw = localStorage.getItem(`${STORAGE_KEYS.FAVORITES}_${userId}`);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed;
     }
   } catch (e) {}
-  return ['arg-1986', 'boca-2024'];
+  return [];
 }
+
+// Limpieza: versiones anteriores guardaban favoritos de invitados en esta clave.
+try {
+  localStorage.removeItem(`${STORAGE_KEYS.FAVORITES}_guest`);
+} catch (e) {}
 
 // 2. Estado Global Reactivo
 export const jerseys = ref<Jersey[]>(migrateAndLoadJerseys());
 export const cart = ref<CartItem[]>(loadStoredCart());
 export const orders = ref<Order[]>(loadStoredOrders());
 export const theme = ref<'light' | 'dark'>(loadStoredTheme());
-export const themeMode = theme;
 
 // Control de Drawers y Modales
 export const isCartOpen = ref<boolean>(false);
@@ -139,11 +162,13 @@ export const isFavoritesOpen = ref<boolean>(false);
 // Favoritos reactivos sincronizados con usuario actual
 export const favorites = ref<string[]>(loadStoredFavorites(currentUser.value?.id));
 
-// Cambio de usuario actualiza sus favoritos
+// Al cambiar de usuario se cargan sus favoritos. Al cerrar sesión quedan vacíos en memoria.
+// Los pedidos no hace falta limpiarlos: cada vista los filtra según el usuario actual.
 watch(
   currentUser,
   (newUser) => {
     favorites.value = loadStoredFavorites(newUser?.id);
+    if (!newUser) isFavoritesOpen.value = false;
   },
   { immediate: true }
 );
@@ -151,9 +176,9 @@ watch(
 watch(
   favorites,
   (newVal) => {
+    if (!currentUser.value) return; // sin sesión no se guarda nada
     try {
-      const key = `${STORAGE_KEYS.FAVORITES}_${currentUser.value?.id || 'guest'}`;
-      localStorage.setItem(key, JSON.stringify(newVal));
+      localStorage.setItem(`${STORAGE_KEYS.FAVORITES}_${currentUser.value.id}`, JSON.stringify(newVal));
     } catch (e) {}
   },
   { deep: true }
@@ -187,12 +212,8 @@ export const deleteModalState = reactive<{
   jersey: null
 });
 
-export const apiSyncState = reactive<RemoteSyncStatus>({
-  status: 'idle',
-  message: 'Iniciando conexión con API...',
-  lastChecked: null,
-  endpoint: 'Supabase REST API / Dólar API'
-});
+// Estado de la cotización que trae DolarAPI (ver initializeApiService)
+export const dolarStatus = ref<'loading' | 'ok' | 'error'>('loading');
 
 export const liveAnnouncement = ref<string>('CAMISETAS ARGENTINAS, DE TODAS LAS ÉPOCAS');
 
@@ -256,12 +277,13 @@ export const cartTotal = computed(() => {
   return cart.value.reduce((acc, item) => acc + item.jersey.price * item.quantity, 0);
 });
 
-export const favoritesCount = computed(() => {
-  return favorites.value.length;
-});
-
 export const favoriteJerseys = computed(() => {
   return jerseys.value.filter((j) => favorites.value.includes(j.id));
+});
+
+// Se cuentan las camisetas que existen: si el admin borró una favorita, no suma.
+export const favoritesCount = computed(() => {
+  return favoriteJerseys.value.length;
 });
 
 export const filteredJerseys = computed(() => {
@@ -352,7 +374,6 @@ export function createJersey(newJerseyData: Omit<Jersey, 'id' | 'stock'> & { siz
   };
 
   jerseys.value.unshift(created);
-  supabaseService.syncJersey(created);
   return created;
 }
 
@@ -383,7 +404,6 @@ export function updateJersey(id: string, updatedData: Partial<Jersey>): boolean 
     return item;
   });
 
-  supabaseService.syncJersey(updated);
   return true;
 }
 
@@ -394,11 +414,7 @@ export function deleteJersey(id: string): boolean {
   cart.value = cart.value.filter((item) => item.jersey.id !== id);
   favorites.value = favorites.value.filter((favId) => favId !== id);
 
-  if (jerseys.value.length < initialLength) {
-    supabaseService.deleteJersey(id);
-    return true;
-  }
-  return false;
+  return jerseys.value.length < initialLength;
 }
 
 export function getJerseyById(id: string): Jersey | undefined {
@@ -543,48 +559,93 @@ export function createOrder(data: {
   return { success: true, order: newOrder };
 }
 
+// Suma (o resta, con signo negativo) las unidades del pedido al stock de cada talle.
+function applyOrderToStock(order: Order, sign: 1 | -1) {
+  order.items.forEach((item) => {
+    const jersey = getJerseyById(item.jerseyId);
+    if (jersey && jersey.sizeStock[item.size] !== undefined) {
+      jersey.sizeStock[item.size] += sign * item.quantity;
+      jersey.stock = Object.values(jersey.sizeStock).reduce((acc, qty) => acc + qty, 0);
+    }
+  });
+}
+
+// Devuelve el motivo por el que un pedido no se puede reactivar, o null si hay stock de todo.
+function findStockProblem(order: Order): string | null {
+  for (const item of order.items) {
+    const jersey = getJerseyById(item.jerseyId);
+    if (!jersey) return `${item.name} ya no está en el catálogo`;
+    const available = jersey.sizeStock[item.size];
+    if (available === undefined) return `${item.name} ya no tiene talle ${item.size}`;
+    if (item.quantity > available) {
+      return `${item.name} talle ${item.size}: pide ${item.quantity} y hay ${available}`;
+    }
+  }
+  return null;
+}
+
 /**
- * Modificar estado de pedido (Pendiente -> Pagado -> Cancelado)
- * Si se cancela, reintegra automáticamente el stock una sola vez.
- * Si se marca como Pagado, NO vuelve a descontar stock.
+ * Cambia el estado de un pedido respetando las reglas de stock:
+ * - A Cancelado: repone el stock una sola vez (el flag stockDeducted evita reponerlo dos veces).
+ * - De Pendiente a Pagado, o al revés: no toca el stock, ya estaba descontado.
+ * - De Cancelado a Pendiente o Pagado: vuelve a descontar, pero solo si hay stock de todo el pedido.
+ *   Si falta algo, el pedido no cambia y se devuelve el motivo (nada se descuenta a medias).
  */
-export function updateOrderStatus(orderId: string, newStatus: OrderStatus): boolean {
+export function updateOrderStatus(orderId: string, newStatus: OrderStatus): { success: boolean; error?: string } {
   const order = orders.value.find((o) => o.id === orderId);
-  if (!order) return false;
+  if (!order) return { success: false, error: 'El pedido no existe' };
 
-  const previousStatus = order.status;
-  if (previousStatus === newStatus) return true;
-
-  // Caso: Cancelación de pedido y devolución de stock
   if (newStatus === 'Cancelado' && order.stockDeducted) {
-    order.items.forEach((item) => {
-      const jersey = getJerseyById(item.jerseyId);
-      if (jersey && jersey.sizeStock[item.size] !== undefined) {
-        jersey.sizeStock[item.size] += item.quantity;
-        jersey.stock = Object.values(jersey.sizeStock).reduce((acc, qty) => acc + qty, 0);
-      }
-    });
+    applyOrderToStock(order, 1);
     order.stockDeducted = false;
   }
 
-  // Caso: Si un pedido cancelado se vuelve a reactivar como Pendiente o Pagado
-  if (previousStatus === 'Cancelado' && newStatus !== 'Cancelado' && !order.stockDeducted) {
-    order.items.forEach((item) => {
-      const jersey = getJerseyById(item.jerseyId);
-      if (jersey && jersey.sizeStock[item.size] !== undefined) {
-        jersey.sizeStock[item.size] = Math.max(0, jersey.sizeStock[item.size] - item.quantity);
-        jersey.stock = Object.values(jersey.sizeStock).reduce((acc, qty) => acc + qty, 0);
-      }
-    });
+  if (order.status === 'Cancelado' && newStatus !== 'Cancelado' && !order.stockDeducted) {
+    const problem = findStockProblem(order);
+    if (problem) return { success: false, error: problem };
+    applyOrderToStock(order, -1);
     order.stockDeducted = true;
   }
 
   order.status = newStatus;
-  return true;
+  return { success: true };
+}
+
+export interface BulkStatusResult {
+  updated: string[];
+  unchanged: string[];
+  skipped: { id: string; reason: string }[];
+}
+
+/**
+ * Cambia el estado de varios pedidos, de a uno. Como el stock se actualiza en cada paso,
+ * dos pedidos que compiten por la última unidad no pueden reactivarse los dos.
+ */
+export function updateOrdersStatus(orderIds: string[], newStatus: OrderStatus): BulkStatusResult {
+  const result: BulkStatusResult = { updated: [], unchanged: [], skipped: [] };
+
+  for (const id of orderIds) {
+    if (orders.value.find((o) => o.id === id)?.status === newStatus) {
+      result.unchanged.push(id);
+      continue;
+    }
+    const res = updateOrderStatus(id, newStatus);
+    if (res.success) {
+      result.updated.push(id);
+    } else {
+      result.skipped.push({ id, reason: res.error || 'No se pudo actualizar' });
+    }
+  }
+  return result;
 }
 
 // 8. Métodos de Favoritos
 export function toggleFavorite(id: string) {
+  // Los favoritos son por cuenta: sin sesión se pide iniciarla.
+  if (!currentUser.value) {
+    openLoginModal('Iniciá sesión para guardar favoritos');
+    return;
+  }
   const idx = favorites.value.indexOf(id);
   if (idx > -1) {
     favorites.value.splice(idx, 1);
@@ -615,27 +676,18 @@ export function confirmDeleteJersey() {
   }
 }
 
-// 10. Inicialización de API externa con Fetch
+// 10. Consumo de DolarAPI con fetch: se llama una vez, desde App.vue (onMounted).
+// Si falla, la app sigue funcionando y la barra superior muestra el mensaje por defecto.
 export async function initializeApiService() {
-  apiSyncState.status = 'loading';
-  apiSyncState.message = 'Sincronizando con Supabase y Dólar API...';
-
   try {
-    const announcement = await supabaseService.fetchLiveAnnouncements();
-    liveAnnouncement.value = announcement.message;
-
-    const result = await supabaseService.fetchJerseys();
-    if (result.fromApi && result.data && result.data.length > 0) {
-      apiSyncState.status = 'success';
-      apiSyncState.message = `Sincronizado con Supabase (${result.data.length} camisetas en API)`;
-    } else {
-      apiSyncState.status = 'fallback';
-      apiSyncState.message = `Modo local activo (${jerseys.value.length} camisetas en inventario)`;
+    const quotes = await fetchDolarQuotes();
+    dolarStatus.value = 'ok';
+    const card = quotes.find((quote) => quote.casa === 'tarjeta');
+    if (card) {
+      liveAnnouncement.value = `Dólar Tarjeta: $${card.venta.toLocaleString('es-AR')} ARS · Envíos a todo el país · 3 y 6 cuotas sin interés`;
     }
-  } catch (err: any) {
-    apiSyncState.status = 'fallback';
-    apiSyncState.message = `Persistencia LocalStorage activa (${jerseys.value.length} camisetas)`;
-  } finally {
-    apiSyncState.lastChecked = new Date().toLocaleTimeString('es-AR');
+  } catch (error) {
+    console.warn('[DolarAPI] No se pudo obtener la cotización:', error);
+    dolarStatus.value = 'error';
   }
 }

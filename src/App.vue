@@ -6,34 +6,18 @@ import CartDrawer from './components/CartDrawer.vue';
 import FavoritesDrawer from './components/FavoritesDrawer.vue';
 import AuthModal from './components/AuthModal.vue';
 import ConfirmModal from './components/ConfirmModal.vue';
+import ScrollTopButton from './components/ScrollTopButton.vue';
 import {
   initializeApiService,
   deleteModalState,
   confirmDeleteJersey,
-  closeDeleteConfirmation,
-  themeMode
+  closeDeleteConfirmation
 } from './store/useStore';
 
-/**
- * Consigna PDF: "Uso de los hooks created() y mounted()"
- * 1. FASE CREATED: En la Composition API de Vue 3, el cuerpo de <script setup> se ejecuta
- *    inmediatamente en el ciclo de vida equivalente a created() (antes de que el componente sea montado).
- *    Aquí verificamos el tema inicial y datos de la tienda.
- */
-console.info('[App.vue - created() hook phase]: Inicializando estado de la aplicación Trapos de Primera');
-if (themeMode.value === 'dark') {
-  document.documentElement.classList.add('dark');
-} else {
-  document.documentElement.classList.remove('dark');
-}
-
-/**
- * 2. FASE MOUNTED: onMounted() se ejecuta una vez que el DOM está listo.
- *    Aquí inicializamos el consumo de la API mediante Fetch (Supabase / Dólar) y servicios externos.
- */
-onMounted(async () => {
-  console.info('[App.vue - mounted() hook]: Componente montado en el DOM, inicializando consumo de API');
-  await initializeApiService();
+// onMounted() es el mounted() de la Composition API: corre cuando el DOM ya está listo.
+// Acá se pide la cotización a DolarAPI con fetch (ver services/apiService.ts).
+onMounted(() => {
+  initializeApiService();
 });
 </script>
 
@@ -62,6 +46,9 @@ onMounted(async () => {
 
     <!-- Modal de Inicio de Sesión y Creación de Cuenta (con soporte Google GIS) -->
     <AuthModal />
+
+    <!-- Botón flotante para volver arriba -->
+    <ScrollTopButton />
 
     <!-- Modal Global de Confirmación de Eliminación -->
     <ConfirmModal

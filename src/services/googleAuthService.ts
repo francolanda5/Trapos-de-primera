@@ -1,6 +1,6 @@
 /**
- * Google Identity Services (GIS) Integration for Trapos de Primera.
- * Provides authentic Google OAuth Sign-In flow without mock shortcuts.
+ * Inicio de sesión con Google Identity Services (GIS).
+ * Solo se activa si hay un Client ID en VITE_GOOGLE_CLIENT_ID (ver GOOGLE_OAUTH.md).
  */
 
 declare global {
@@ -32,9 +32,9 @@ declare global {
   }
 }
 
-// Client ID configured via Vite env variable or user-defined setting
+// Client ID leído de las variables de entorno de Vite (.env.local o Vercel)
 export const GOOGLE_CLIENT_ID =
-  (import.meta.env.VITE_GOOGLE_CLIENT_ID as string) || '';
+  ((import.meta.env.VITE_GOOGLE_CLIENT_ID as string) || '').trim();
 
 export interface GoogleUserPayload {
   email: string;
@@ -44,7 +44,9 @@ export interface GoogleUserPayload {
 }
 
 /**
- * Decodifica el token JWT retornado por Google Identity Services sin librerías externas
+ * Decodifica el token JWT que devuelve Google, sin librerías externas.
+ * OJO: solo LEE los datos, NO verifica la firma. Verificarla requiere un servidor, así que
+ * en una app real esto no alcanza. Es aceptable en este TP porque no hay backend ni datos sensibles.
  */
 export function parseJwt(token: string): GoogleUserPayload | null {
   try {
@@ -63,24 +65,22 @@ export function parseJwt(token: string): GoogleUserPayload | null {
   }
 }
 
+// Se guarda la promesa para que el script se cargue una sola vez, aunque el modal se abra varias.
+let scriptPromise: Promise<boolean> | null = null;
+
 /**
  * Carga dinámicamente el SDK oficial de Google Identity Services
  */
 export function loadGoogleIdentityScript(): Promise<boolean> {
-  return new Promise((resolve) => {
+  if (scriptPromise) return scriptPromise;
+
+  scriptPromise = new Promise((resolve) => {
     if (window.google?.accounts?.id) {
       resolve(true);
       return;
     }
 
-    const scriptId = 'google-gsi-client';
-    if (document.getElementById(scriptId)) {
-      resolve(true);
-      return;
-    }
-
     const script = document.createElement('script');
-    script.id = scriptId;
     script.src = 'https://accounts.google.com/gsi/client';
     script.async = true;
     script.defer = true;
@@ -91,4 +91,6 @@ export function loadGoogleIdentityScript(): Promise<boolean> {
     };
     document.head.appendChild(script);
   });
+
+  return scriptPromise;
 }

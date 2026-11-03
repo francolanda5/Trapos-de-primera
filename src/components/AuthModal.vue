@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, watch, nextTick } from 'vue';
 import {
   isAuthModalOpen,
   authModalMode,
+  authModalMessage,
   loginWithEmail,
   registerWithEmail,
   loginAsTestAdmin,
@@ -13,8 +14,9 @@ import {
   loadGoogleIdentityScript
 } from '../services/googleAuthService';
 
-const isGoogleReady = ref(false);
+const googleLoadFailed = ref(false);
 const googleButtonContainer = ref<HTMLElement | null>(null);
+let googleInitialized = false;
 
 const form = reactive({
   name: '',
@@ -53,6 +55,9 @@ async function handleSubmit() {
   if (authModalMode.value === 'register') {
     if (!form.name.trim()) {
       errors.name = 'El nombre completo es obligatorio.';
+      isValid = false;
+    } else if (form.name.trim().length < 3) {
+      errors.name = 'El nombre debe tener al menos 3 caracteres.';
       isValid = false;
     }
   }
@@ -100,32 +105,60 @@ async function handleSubmit() {
   }
 }
 
-// Inicializar Google Identity Services
-onMounted(async () => {
+// Dibuja el botón oficial de Google. Solo si hay Client ID: sin él no se carga nada de Google.
+async function setupGoogleButton() {
+  if (!GOOGLE_CLIENT_ID) return;
+
   const loaded = await loadGoogleIdentityScript();
-  if (loaded && window.google?.accounts?.id && GOOGLE_CLIENT_ID) {
-    try {
+  if (!loaded || !window.google?.accounts?.id) {
+    googleLoadFailed.value = true;
+    return;
+  }
+
+  googleLoadFailed.value = false;
+  try {
+    if (!googleInitialized) {
       window.google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
         callback: (response) => {
-          if (response.credential) {
-            loginWithGoogleCredential(response.credential);
-          }
+          const res = loginWithGoogleCredential(response.credential);
+          if (!res.success) errors.general = res.error;
         }
       });
-      isGoogleReady.value = true;
-      if (googleButtonContainer.value) {
-        window.google.accounts.id.renderButton(googleButtonContainer.value, {
-          theme: 'outline',
-          size: 'large',
-          width: 320
-        });
-      }
-    } catch (e) {
-      console.warn('Error al inicializar Google Sign-In:', e);
+      googleInitialized = true;
     }
+
+    await nextTick();
+    const container = googleButtonContainer.value;
+    if (container) {
+      container.innerHTML = '';
+      window.google.accounts.id.renderButton(container, {
+        theme: 'outline',
+        size: 'large',
+        // Google admite de 200 a 400 px: se ajusta al ancho disponible del modal
+        width: Math.max(200, Math.min(container.clientWidth, 320))
+      });
+    }
+  } catch (e) {
+    console.warn('Error al inicializar Google Sign-In:', e);
+    googleLoadFailed.value = true;
   }
-});
+}
+
+// El contenido del modal está en un v-if: el contenedor del botón solo existe con el modal abierto.
+// Por eso el botón se dibuja cada vez que se abre, y no en onMounted.
+watch(
+  isAuthModalOpen,
+  (isOpen) => {
+    resetErrors();
+    if (isOpen) {
+      setupGoogleButton();
+    } else {
+      authModalMessage.value = '';
+    }
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
@@ -137,7 +170,7 @@ onMounted(async () => {
         @click.self="isAuthModalOpen = false"
       >
         <div
-          class="bg-[#F7F4EA] dark:bg-[#0C2333] border border-[#E2DEC9] dark:border-[#1E4663] rounded-xl max-w-md w-full p-6 sm:p-8 shadow-2xl text-slate-800 dark:text-neutral-100"
+          class="bg-[#F7F4EA] dark:bg-[#0C2333] border border-[#E2DEC9] dark:border-[#1E4663] rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 shadow-2xl text-slate-800 dark:text-neutral-100"
           role="dialog"
           aria-modal="true"
         >
@@ -165,10 +198,20 @@ onMounted(async () => {
             <button
               type="button"
               @click="isAuthModalOpen = false"
+              aria-label="Cerrar"
               class="text-slate-400 hover:text-slate-700 dark:hover:text-white text-xl cursor-pointer"
             >
               ✕
             </button>
+          </div>
+
+          <!-- Motivo por el que se pide iniciar sesión (favoritos, checkout, rutas protegidas) -->
+          <div
+            v-if="authModalMessage"
+            role="status"
+            class="mb-4 p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-200 text-xs rounded font-medium"
+          >
+            {{ authModalMessage }}
           </div>
 
           <!-- Alerta de error general -->
@@ -183,11 +226,12 @@ onMounted(async () => {
           <form @submit.prevent="handleSubmit" class="space-y-4" novalidate>
             <!-- Campo Nombre (solo registro) -->
             <div v-if="authModalMode === 'register'">
-              <label class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">
+              <label for="auth-name" class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">
                 Nombre y Apellido *
               </label>
               <input
-                v-model="form.name"
+                id="auth-name"
+              v-model="form.name"
                 type="text"
                 placeholder="Ej: Franco Rossi"
                 class="w-full text-xs bg-white dark:bg-[#112C3F] border border-neutral-300 dark:border-neutral-600 rounded px-3 py-2 text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#48B0DA]"
@@ -199,11 +243,12 @@ onMounted(async () => {
 
             <!-- Campo Email -->
             <div>
-              <label class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">
+              <label for="auth-email" class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">
                 Correo Electrónico *
               </label>
               <input
-                v-model="form.email"
+                id="auth-email"
+              v-model="form.email"
                 type="email"
                 placeholder="tu@email.com"
                 class="w-full text-xs bg-white dark:bg-[#112C3F] border border-neutral-300 dark:border-neutral-600 rounded px-3 py-2 text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#48B0DA]"
@@ -215,11 +260,12 @@ onMounted(async () => {
 
             <!-- Campo Contraseña -->
             <div>
-              <label class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">
+              <label for="auth-password" class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">
                 Contraseña *
               </label>
               <input
-                v-model="form.password"
+                id="auth-password"
+              v-model="form.password"
                 type="password"
                 placeholder="Mínimo 6 caracteres"
                 class="w-full text-xs bg-white dark:bg-[#112C3F] border border-neutral-300 dark:border-neutral-600 rounded px-3 py-2 text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#48B0DA]"
@@ -231,11 +277,12 @@ onMounted(async () => {
 
             <!-- Campo Confirmar Contraseña (solo registro) -->
             <div v-if="authModalMode === 'register'">
-              <label class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">
+              <label for="auth-confirm" class="block text-xs font-bold text-[#0C2333] dark:text-neutral-200 mb-1">
                 Confirmar Contraseña *
               </label>
               <input
-                v-model="form.confirmPassword"
+                id="auth-confirm"
+              v-model="form.confirmPassword"
                 type="password"
                 placeholder="Repetí la contraseña"
                 class="w-full text-xs bg-white dark:bg-[#112C3F] border border-neutral-300 dark:border-neutral-600 rounded px-3 py-2 text-slate-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#48B0DA]"
@@ -266,12 +313,12 @@ onMounted(async () => {
 
           <!-- Contenedor Google Identity Services -->
           <div class="flex flex-col items-center justify-center">
-            <div ref="googleButtonContainer" v-show="isGoogleReady"></div>
+            <div v-if="GOOGLE_CLIENT_ID && !googleLoadFailed" ref="googleButtonContainer" class="w-full flex justify-center min-h-11"></div>
 
-            <div v-if="!GOOGLE_CLIENT_ID" class="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 rounded text-[11px] text-amber-900 dark:text-amber-200 w-full text-center">
-              <p class="font-bold mb-1">Google OAuth preparado</p>
-              <p class="text-[10px] leading-relaxed">
-                Para activar el botón oficial de Google en producción, configurá tu <code>VITE_GOOGLE_CLIENT_ID</code> en las variables de entorno. El flujo de rol y decodificación JWT ya está implementado.
+            <div v-else class="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 rounded text-[11px] text-amber-900 dark:text-amber-200 w-full text-center">
+              <p class="font-bold mb-1">{{ GOOGLE_CLIENT_ID ? 'No se pudo cargar Google' : 'Google no configurado' }}</p>
+              <p class="leading-relaxed">
+                {{ GOOGLE_CLIENT_ID ? 'Revisá tu conexión e intentá de nuevo.' : 'El ingreso con Google no está disponible en esta instalación. Usá tu correo y contraseña.' }}
               </p>
             </div>
           </div>

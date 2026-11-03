@@ -3,8 +3,17 @@ import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { jerseys, filterState } from '../store/useStore';
 import ProductCard from '../components/ProductCard.vue';
+import { CATEGORY_COVERS } from '../data/categoryCovers';
 
 const router = useRouter();
+
+// Tarjetas de "Elegí tu cancha": el texto va en dos líneas
+const categoryCards = [
+  { category: 'Primera División', lines: ['PRIMERA', 'DIVISIÓN'] },
+  { category: 'Primera Nacional', lines: ['PRIMERA', 'NACIONAL'] },
+  { category: 'Primera B Metropolitana', lines: ['PRIMERA B', 'METROPOLITANA'] },
+  { category: 'Selección Argentina', lines: ['SELECCIÓN', 'ARGENTINA'] }
+];
 
 // Recién llegadas (4 camisetas)
 const recentArrivals = computed(() => {
@@ -20,26 +29,20 @@ const mostSearched = computed(() => {
   return jerseys.value.slice(5, 8);
 });
 
+// Los filtros viajan en la URL: al montarse, CatalogView los lee de route.query.
 function navigateCategory(cat: string) {
-  filterState.categories = [cat];
-  filterState.era = 'Todas';
   filterState.search = '';
-  router.push('/catalogo');
+  router.push({ path: '/catalogo', query: { categoria: cat } });
 }
 
 function navigateEra(era: 'Actual' | 'Retro') {
-  filterState.categories = [];
-  filterState.era = era;
   filterState.search = '';
-  router.push('/catalogo');
+  router.push({ path: '/catalogo', query: { era } });
 }
 
 function navigateDecade(dec: string) {
-  filterState.categories = [];
-  filterState.era = 'Retro';
-  filterState.decade = dec;
   filterState.search = '';
-  router.push('/catalogo');
+  router.push({ path: '/catalogo', query: { era: 'Retro', decada: dec } });
 }
 </script>
 
@@ -49,7 +52,8 @@ function navigateDecade(dec: string) {
     <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center pt-2 pb-6" data-purpose="hero-section">
       <!-- Hero Copy Column -->
       <div class="lg:col-span-5 flex flex-col items-start justify-center">
-        <h1 class="font-condensed text-4xl sm:text-5xl lg:text-6xl uppercase font-extrabold text-[#0C2333] dark:text-[#F7F4EA] leading-[0.95] tracking-tight mb-4">
+        <!-- En celular el tamaño depende del ancho de pantalla (vw) para ocupar toda la fila -->
+        <h1 class="font-condensed whitespace-nowrap text-[clamp(2.5rem,17.8vw,6rem)] sm:text-5xl lg:text-6xl uppercase font-extrabold text-[#0C2333] dark:text-[#F7F4EA] leading-[0.95] tracking-tight mb-4">
           EL FÚTBOL<br />
           ARGENTINO<br />
           SE VISTE DE<br />
@@ -78,9 +82,9 @@ function navigateDecade(dec: string) {
       <div class="lg:col-span-7 flex justify-center lg:justify-end">
         <div class="relative w-full rounded-xl overflow-hidden shadow-xl bg-white/40 dark:bg-slate-800/40">
           <img
-            alt="Camisetas de fútbol colgadas en percha: Real Madrid, River Plate y Argentina"
+            alt="Camisetas de Boca, Argentina y Chacarita colgadas en perchas sobre una pared de ladrillos"
             class="w-full h-auto object-cover max-h-[440px] transform hover:scale-105 transition-transform duration-500"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuBJxxYdifj1Yqvlx4BrnbvkKaFDPvfSLAPtPz94PCGjYAKWSdJ316BG4bcf_dsR_dC-P9siFyGag-U8y5-hBy6aeugTzUEgxC-_NlqGg97U6gEwh6KThDmTbpMIB1BarUSGyvPOllbiNuAzxj49fioh0bNt75RytoZhmYtwWf79Z3PK9u7g1NuRi3Z2YCx3ZTlJsB4zoSKLAOd1xhu0ed33E2TiD7dF4phFShD3X0zqvW9triNcripPfQ"
+            src="/assets/portada.webp" width="1400" height="788"
           />
         </div>
       </div>
@@ -100,48 +104,28 @@ function navigateDecade(dec: string) {
 
       <!-- Category Cards Grid -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        <!-- Primera División -->
+        <!-- Las alturas llevan "!" porque la regla táctil de index.css (min-height: 44px) le gana a Tailwind -->
         <button
-          @click="navigateCategory('Primera División')"
-          class="bg-[#0C2333] dark:bg-[#102d42] dark:border dark:border-slate-700 hover:bg-[#13354d] dark:hover:bg-[#183e5a] rounded-lg p-5 flex flex-col justify-between min-h-[110px] sm:min-h-[125px] transition-all transform hover:-translate-y-1 shadow-md text-left cursor-pointer"
+          v-for="card in categoryCards"
+          :key="card.category"
+          @click="navigateCategory(card.category)"
+          :aria-label="`Ver camisetas de ${card.category}`"
+          class="group relative overflow-hidden bg-[#0C2333] dark:bg-[#102d42] dark:border dark:border-slate-700 hover:bg-[#13354d] dark:hover:bg-[#183e5a] rounded-lg p-5 flex flex-col justify-between min-h-[140px]! sm:min-h-[180px]! lg:min-h-[200px]! transition-all transform hover:-translate-y-1 shadow-md text-left cursor-pointer"
         >
-          <span class="font-condensed font-bold text-white text-base sm:text-lg leading-tight uppercase">
-            PRIMERA<br />DIVISIÓN
-          </span>
-          <span class="text-[#D8B15E] font-bold text-lg self-end">→</span>
-        </button>
+          <!-- La foto es decorativa y va de fondo: si falla o tarda, queda el azul marino de la tarjeta -->
+          <span
+            aria-hidden="true"
+            class="absolute inset-0 bg-cover transition-transform duration-500 motion-safe:group-hover:scale-105"
+            :style="{ backgroundImage: `url('${CATEGORY_COVERS[card.category].url}')`, backgroundPosition: CATEGORY_COVERS[card.category].position }"
+          ></span>
+          <!-- Degradé más fuerte a la izquierda y abajo, para que el texto se lea siempre -->
+          <span aria-hidden="true" class="absolute inset-0 bg-gradient-to-r from-[#0C2333]/90 via-[#0C2333]/45 to-transparent"></span>
+          <span aria-hidden="true" class="absolute inset-0 bg-gradient-to-t from-[#0C2333]/90 via-[#0C2333]/20 to-transparent"></span>
 
-        <!-- Primera Nacional -->
-        <button
-          @click="navigateCategory('Primera Nacional')"
-          class="bg-[#0C2333] dark:bg-[#102d42] dark:border dark:border-slate-700 hover:bg-[#13354d] dark:hover:bg-[#183e5a] rounded-lg p-5 flex flex-col justify-between min-h-[110px] sm:min-h-[125px] transition-all transform hover:-translate-y-1 shadow-md text-left cursor-pointer"
-        >
-          <span class="font-condensed font-bold text-white text-base sm:text-lg leading-tight uppercase">
-            PRIMERA<br />NACIONAL
+          <span class="relative font-condensed font-bold text-white text-base sm:text-lg leading-tight uppercase">
+            {{ card.lines[0] }}<br />{{ card.lines[1] }}
           </span>
-          <span class="text-[#D8B15E] font-bold text-lg self-end">→</span>
-        </button>
-
-        <!-- Primera B Metropolitana -->
-        <button
-          @click="navigateCategory('Primera B Metropolitana')"
-          class="bg-[#0C2333] dark:bg-[#102d42] dark:border dark:border-slate-700 hover:bg-[#13354d] dark:hover:bg-[#183e5a] rounded-lg p-5 flex flex-col justify-between min-h-[110px] sm:min-h-[125px] transition-all transform hover:-translate-y-1 shadow-md text-left cursor-pointer"
-        >
-          <span class="font-condensed font-bold text-white text-base sm:text-lg leading-tight uppercase">
-            PRIMERA B<br />METROPOLITANA
-          </span>
-          <span class="text-[#D8B15E] font-bold text-lg self-end">→</span>
-        </button>
-
-        <!-- Selección Argentina -->
-        <button
-          @click="navigateCategory('Selección Argentina')"
-          class="bg-[#0C2333] dark:bg-[#102d42] dark:border dark:border-slate-700 hover:bg-[#13354d] dark:hover:bg-[#183e5a] rounded-lg p-5 flex flex-col justify-between min-h-[110px] sm:min-h-[125px] transition-all transform hover:-translate-y-1 shadow-md text-left cursor-pointer"
-        >
-          <span class="font-condensed font-bold text-white text-base sm:text-lg leading-tight uppercase">
-            SELECCIÓN<br />ARGENTINA
-          </span>
-          <span class="text-[#D8B15E] font-bold text-lg self-end">→</span>
+          <span class="relative text-[#D8B15E] font-bold text-lg self-end">→</span>
         </button>
       </div>
     </section>

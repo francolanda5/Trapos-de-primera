@@ -1,8 +1,29 @@
+# Dependencias y compilados (se regeneran con npm install / npm run build)
 node_modules/
-build/
 dist/
+build/
 coverage/
-.DS_Store
-*.log
-.env*
+
+# Variables de entorno locales (nunca se suben)
+.env
+.env.*
 !.env.example
+
+# Vercel
+.vercel/
+
+# Entregable comprimido
+*.zip
+
+# Documentación interna y PDFs: no se publican (solo README.md)
+*.md
+!README.md
+*.pdf
+pdfs/
+
+# Sistema y editor
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/

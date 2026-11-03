@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { resetToDefaultJerseys, theme, toggleTheme } from '../store/useStore';
+import { isAdmin } from '../store/useAuth';
 
 function handleReset() {
   if (confirm('¿Restaurar las 18 camisetas originales de Trapos de Primera? Esto reseteará las existencias y ediciones locales.')) {
@@ -52,6 +53,7 @@ function handleReset() {
               <li><router-link to="/catalogo" class="hover:text-[#48B0DA] transition-colors">Catálogo</router-link></li>
               <li><router-link to="/acerca-de" class="hover:text-[#48B0DA] transition-colors">Acerca de</router-link></li>
               <li><router-link to="/mis-pedidos" class="hover:text-[#48B0DA] transition-colors">Mis Pedidos</router-link></li>
+              <li><router-link to="/guia-de-talles" class="hover:text-[#48B0DA] transition-colors">Guía de talles</router-link></li>
             </ul>
             <ul class="space-y-2">
               <li><router-link :to="{ path: '/catalogo', query: { era: 'Retro' } }" class="hover:text-[#48B0DA] transition-colors">Retro</router-link></li>
@@ -78,7 +80,8 @@ function handleReset() {
                 Administrar Pedidos
               </router-link>
             </li>
-            <li>
+            <!-- El stock se edita desde el catálogo, que solo muestra esas acciones al admin -->
+            <li v-if="isAdmin">
               <router-link to="/catalogo" class="hover:text-[#48B0DA] transition-colors">
                 Control de Stock
               </router-link>
@@ -117,7 +120,7 @@ function handleReset() {
 
       <!-- Copyright Notice -->
       <div class="border-t border-neutral-800 pt-6 text-center text-[11px] text-neutral-400">
-        <p>© 2024 Trapos de Primera. Todos los derechos reservados. Examen Práctica Profesionalizante ISEC.</p>
+        <p>© 2026 Trapos de Primera. Todos los derechos reservados. Examen Práctica Profesionalizante ISEC.</p>
       </div>
     </div>
   </footer>

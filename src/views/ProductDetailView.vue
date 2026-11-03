@@ -8,13 +8,15 @@ import {
   toggleFavorite,
   isFavorite
 } from '../store/useStore';
+import { isAdmin } from '../store/useAuth';
+import { SIZE_GUIDE } from '../data/sizeGuide';
 import type { Jersey } from '../types';
 
 const route = useRoute();
 const router = useRouter();
 
 const jersey = ref<Jersey | null>(null);
-const currentImage = ref<string>('');
+const activeImageIndex = ref<number>(0);
 const selectedSize = ref<string>('M');
 const quantity = ref<number>(1);
 const addedToCartSuccess = ref<string | null>(null);
@@ -24,7 +26,7 @@ function loadProduct() {
   const found = getJerseyById(id);
   if (found) {
     jersey.value = found;
-    currentImage.value = found.image;
+    activeImageIndex.value = 0;
     // Seleccionar por defecto el primer talle que tenga stock si es posible
     const inStockSize = found.sizes.find((s) => (found.sizeStock[s] || 0) > 0) || found.sizes[0] || 'M';
     selectedSize.value = inStockSize;
@@ -63,8 +65,40 @@ watch(selectedSize, () => {
   }
 });
 
-function changeImage(imgUrl: string) {
-  currentImage.value = imgUrl;
+// Galería: la primera vista siempre es `image`, así una camiseta creada a mano funciona con una
+// sola imagen y, si el administrador cambia la foto, la galería muestra la nueva.
+const gallery = computed(() => {
+  if (!jersey.value) return [];
+  return [jersey.value.image, ...(jersey.value.galleryImages ?? []).slice(1)];
+});
+
+const currentImage = computed(() => gallery.value[activeImageIndex.value] ?? '');
+
+function viewLabel(index: number): string {
+  return ['Frente', 'Espalda', 'Detalle'][index] ?? `Vista ${index + 1}`;
+}
+
+// Pasa a otra vista. El módulo hace que después de la última se vuelva a la primera.
+function showImage(index: number) {
+  const total = gallery.value.length;
+  if (total > 0) activeImageIndex.value = (index + total) % total;
+}
+
+// Deslizar en el celular: cuenta solo un gesto horizontal de al menos 40 px.
+const SWIPE_MIN_PX = 40;
+let touchStartX = 0;
+let touchStartY = 0;
+
+function onTouchStart(event: TouchEvent) {
+  touchStartX = event.changedTouches[0].clientX;
+  touchStartY = event.changedTouches[0].clientY;
+}
+
+function onTouchEnd(event: TouchEvent) {
+  const deltaX = event.changedTouches[0].clientX - touchStartX;
+  const deltaY = event.changedTouches[0].clientY - touchStartY;
+  if (Math.abs(deltaX) < SWIPE_MIN_PX || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+  showImage(activeImageIndex.value + (deltaX < 0 ? 1 : -1));
 }
 
 function decreaseQuantity() {
@@ -121,41 +155,39 @@ function formatPrice(val: number): string {
     <!-- BEGIN: ProductSection -->
     <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start pb-8">
       <!-- Columna Izquierda: Galería de Producto -->
-      <div class="lg:col-span-6 flex flex-col gap-3">
+      <div class="lg:col-span-6 flex flex-col lg:flex-row-reverse lg:items-start gap-3">
         <!-- Imagen Principal -->
-        <div class="w-full bg-[#EFECE1] dark:bg-[#112C3F] border border-[#E2DEC6] dark:border-neutral-700 rounded-md p-4 flex items-center justify-center shadow-xs aspect-square overflow-hidden">
-          <img
-            :src="currentImage"
-            :alt="jersey.name"
-            class="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal transition-all duration-300"
-          />
+        <div
+          class="relative w-full lg:flex-1 lg:min-w-0 bg-[#EFECE1] dark:bg-[#112C3F] border border-[#E2DEC6] dark:border-neutral-700 rounded-md shadow-xs jersey-frame touch-pan-y"
+          data-purpose="gallery-main"
+          @touchstart.passive="onTouchStart"
+          @touchend.passive="onTouchEnd"
+        >
+          <!-- La key hace que Vue vea una imagen nueva y aplique el fundido entre las dos -->
+          <transition name="gallery-fade">
+            <img
+              :key="currentImage"
+              :src="currentImage"
+              :alt="`${jersey.name}: ${viewLabel(activeImageIndex).toLowerCase()}`"
+              class="jersey-image absolute inset-0"
+            />
+          </transition>
         </div>
 
-        <!-- Miniaturas en fila de 4 -->
-        <div class="grid grid-cols-4 gap-2.5">
-          <!-- Thumbnail 1: Frente -->
+        <!-- Miniaturas: debajo en celular y al costado en escritorio. Con una sola imagen no hacen falta -->
+        <div v-if="gallery.length > 1" class="grid grid-cols-3 gap-2.5 max-w-xs lg:grid-cols-1 lg:w-20 lg:shrink-0" role="group" aria-label="Vistas de la camiseta" data-purpose="gallery-thumbs">
           <button
+            v-for="(image, index) in gallery"
+            :key="index"
             type="button"
-            @click="changeImage(jersey.image)"
-            class="bg-[#EFECE1] dark:bg-[#112C3F] rounded p-1 aspect-square overflow-hidden flex items-center justify-center focus:outline-none transition-all cursor-pointer"
-            :class="currentImage === jersey.image ? 'border-2 border-[#48B0DA] shadow-xs' : 'border border-[#DCD6C0] dark:border-neutral-700 hover:border-gray-400'"
+            :aria-label="`Ver ${viewLabel(index).toLowerCase()}`"
+            :aria-pressed="index === activeImageIndex"
+            class="jersey-frame bg-[#EFECE1] dark:bg-[#112C3F] rounded transition-all cursor-pointer"
+            :class="index === activeImageIndex ? 'ring-2 ring-[#48B0DA] shadow-xs' : 'ring-1 ring-[#DCD6C0] dark:ring-neutral-700 hover:ring-gray-400'"
+            @click="showImage(index)"
           >
-            <img :src="jersey.image" alt="Frente" class="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal" />
+            <img :src="image" alt="" class="jersey-image" />
           </button>
-
-          <!-- Thumbnails adicionales si existen -->
-          <template v-if="jersey.galleryImages && jersey.galleryImages.length > 0">
-            <button
-              v-for="(gImg, idx) in jersey.galleryImages.slice(1, 4)"
-              :key="idx"
-              type="button"
-              @click="changeImage(gImg)"
-              class="bg-[#EFECE1] dark:bg-[#112C3F] rounded p-1 aspect-square overflow-hidden flex items-center justify-center focus:outline-none transition-all cursor-pointer"
-              :class="currentImage === gImg ? 'border-2 border-[#48B0DA] shadow-xs' : 'border border-[#DCD6C0] dark:border-neutral-700 hover:border-gray-400'"
-            >
-              <img :src="gImg" :alt="`Detalle ${idx + 1}`" class="w-full h-full object-cover mix-blend-multiply dark:mix-blend-normal" />
-            </button>
-          </template>
         </div>
       </div>
 
@@ -171,6 +203,7 @@ function formatPrice(val: number): string {
           </span>
           <div class="h-[1.5px] bg-[#D8B15E] flex-1"></div>
           <router-link
+            v-if="isAdmin"
             :to="`/admin/editar/${jersey.id}`"
             class="text-[11px] font-bold text-[#0C2333] dark:text-[#48B0DA] hover:underline flex items-center gap-1 border border-neutral-300 dark:border-neutral-700 rounded px-2 py-0.5"
             title="Editar existencias y datos de este producto"
@@ -219,12 +252,12 @@ function formatPrice(val: number): string {
         <div class="mt-5">
           <div class="flex items-center justify-between text-xs font-bold mb-2">
             <span class="text-[#0C2333] dark:text-white uppercase">Elegí tu talle</span>
-            <a href="#guia-talles" class="text-[#48B0DA] flex items-center gap-1 font-semibold hover:underline">
+            <router-link to="/guia-de-talles" class="text-[#48B0DA] flex items-center gap-1 font-semibold hover:underline">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path d="M4 6h16M4 10h16M4 14h16M4 18h16" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
               </svg>
               Guía de talles
-            </a>
+            </router-link>
           </div>
 
           <div class="flex items-center gap-2 flex-wrap" role="group">
@@ -391,18 +424,16 @@ function formatPrice(val: number): string {
         </div>
       </details>
 
-      <details class="group bg-[#EFECE1] dark:bg-[#112C3F] border border-[#E2DEC6] dark:border-neutral-700 rounded overflow-hidden" id="guia-talles" open>
+      <details class="group bg-[#EFECE1] dark:bg-[#112C3F] border border-[#E2DEC6] dark:border-neutral-700 rounded overflow-hidden" open>
         <summary class="flex items-center justify-between p-3.5 cursor-pointer list-none select-none font-bold text-xs uppercase tracking-wider text-[#0C2333] dark:text-white">
           <span>TALLES Y MEDIDAS (GUÍA OFICIAL)</span>
           <span class="text-base font-bold transition group-open:rotate-45 text-[#0C2333] dark:text-white">+</span>
         </summary>
         <div class="px-5 pb-4 text-xs text-gray-700 dark:text-gray-300 leading-relaxed border-t border-[#E2DEC6]/60 dark:border-neutral-700/60 pt-3">
           <ul class="space-y-1 font-mono">
-            <li><strong>S:</strong> 50 cm de axila a axila x 70 cm de largo ({{ jersey.sizeStock['S'] ?? 0 }} disponibles)</li>
-            <li><strong>M:</strong> 53 cm de axila a axila x 72 cm de largo ({{ jersey.sizeStock['M'] ?? 0 }} disponibles)</li>
-            <li><strong>L:</strong> 56 cm de axila a axila x 74 cm de largo ({{ jersey.sizeStock['L'] ?? 0 }} disponibles)</li>
-            <li><strong>XL:</strong> 59 cm de axila a axila x 76 cm de largo ({{ jersey.sizeStock['XL'] ?? 0 }} disponibles)</li>
-            <li><strong>XXL:</strong> 62 cm de axila a axila x 78 cm de largo ({{ jersey.sizeStock['XXL'] ?? 0 }} disponibles)</li>
+            <li v-for="row in SIZE_GUIDE" :key="row.size">
+              <strong>{{ row.size }}:</strong> {{ row.chestCm }} cm de axila a axila x {{ row.lengthCm }} cm de largo ({{ jersey.sizeStock[row.size] ?? 0 }} disponibles)
+            </li>
           </ul>
         </div>
       </details>
@@ -412,7 +443,7 @@ function formatPrice(val: number): string {
     <section v-if="relatedJerseys.length > 0" class="mb-14" data-purpose="related-products">
       <div class="flex items-center justify-between mb-5">
         <div class="flex items-center gap-3 flex-1">
-          <h2 class="text-xl sm:text-2xl font-bold font-display text-[#0C2333] dark:text-white uppercase tracking-wide whitespace-nowrap">
+          <h2 class="text-xl sm:text-2xl font-bold font-display text-[#0C2333] dark:text-white uppercase tracking-wide lg:whitespace-nowrap">
             OTROS TRAPOS PARA TU COLECCIÓN
           </h2>
           <div class="h-[1.5px] bg-[#D8B15E] hidden sm:block flex-1 ml-2"></div>
@@ -433,12 +464,13 @@ function formatPrice(val: number): string {
         >
           <router-link
             :to="`/camiseta/${rel.id}`"
-            class="relative p-5 pb-3 flex items-center justify-center aspect-[4/3] bg-[#EBE7D8] dark:bg-[#081722] overflow-hidden"
+            class="jersey-frame relative p-5 pb-3 bg-[#EBE7D8] dark:bg-[#081722]"
           >
             <img
               :src="rel.image"
               :alt="rel.name"
-              class="w-full h-full object-contain mix-blend-multiply dark:mix-blend-normal group-hover:scale-105 transition-transform duration-300"
+              class="jersey-image mix-blend-multiply dark:mix-blend-normal group-hover:scale-105 transition-transform duration-300"
+              loading="lazy"
             />
           </router-link>
 

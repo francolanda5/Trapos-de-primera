@@ -1,19 +1,26 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import {
   filterState,
   filteredJerseys,
-  availableTeams
+  availableTeams,
+  openDeleteConfirmation
 } from '../store/useStore';
+import { isAdmin } from '../store/useAuth';
 import ProductCard from '../components/ProductCard.vue';
 import FilterAccordion from '../components/FilterAccordion.vue';
+import SearchBar from '../components/SearchBar.vue';
 
 const route = useRoute();
+const router = useRouter();
 
 // Paginación
 const currentPage = ref(1);
 const itemsPerPage = 9;
+
+// En celular y tablet los filtros arrancan plegados para que se vean primero las camisetas
+const showFilters = ref(false);
 
 // Total de páginas computado
 const totalPages = computed(() => {
@@ -58,9 +65,8 @@ function syncFromRoute() {
     filterState.era = 'Todas';
   }
 
-  if (route.query.decada) {
-    filterState.decade = String(route.query.decada);
-  }
+  filterState.decade = route.query.decada ? String(route.query.decada) : 'Todas las épocas';
+
   if (route.query.q) {
     filterState.search = String(route.query.q);
   }
@@ -164,6 +170,20 @@ function setPage(p: number) {
       </p>
     </div>
 
+    <!-- Buscador por texto: filtra mientras se escribe (filteredJerseys es un computed) -->
+    <div class="mb-5 flex flex-col sm:flex-row sm:items-center gap-3">
+      <div class="flex-1">
+        <SearchBar v-model="filterState.search" label="Buscar en el catálogo" placeholder="Buscar por nombre, equipo, temporada..." />
+      </div>
+      <router-link
+        v-if="isAdmin"
+        to="/admin/camisetas"
+        class="px-4 py-2 bg-[#0C2333] dark:bg-[#48B0DA] text-white dark:text-[#0C2333] text-xs font-bold rounded text-center hover:opacity-90 transition-opacity whitespace-nowrap"
+      >
+        + Nueva camiseta
+      </router-link>
+    </div>
+
     <!-- Top Filter Pill Controls & Quick Selects -->
     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6" data-purpose="top-filter-bar">
       <!-- Quick Filter Buttons -->
@@ -224,13 +244,14 @@ function setPage(p: number) {
         </span>
 
         <div class="flex items-center text-xs text-gray-600 dark:text-gray-300 gap-1.5">
-          <span>Ordenar por precio</span>
+          <label for="catalog-sort">Ordenar por</label>
           <select
+            id="catalog-sort"
             v-model="filterState.sortBy"
             class="text-xs font-semibold text-[#0C2333] dark:text-white bg-white dark:bg-[#112C3F] border border-[#0C2333]/40 dark:border-neutral-600 rounded-md py-1.5 pl-2.5 pr-8 focus:ring-[#48B0DA] focus:border-[#48B0DA] cursor-pointer"
           >
-            <option value="price-asc">Menor a mayor</option>
-            <option value="price-desc">Mayor a menor</option>
+            <option value="price-asc">Precio: menor a mayor</option>
+            <option value="price-desc">Precio: mayor a menor</option>
             <option value="recent">Más recientes</option>
             <option value="name">Alfabético</option>
           </select>
@@ -241,7 +262,20 @@ function setPage(p: number) {
     <!-- Main Grid: Sidebar + Products -->
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
       <!-- BEGIN: SidebarFilters -->
-      <aside class="lg:col-span-1 space-y-5 text-sm" data-purpose="sidebar-filters">
+      <button
+        type="button"
+        @click="showFilters = !showFilters"
+        :aria-expanded="showFilters"
+        class="lg:hidden w-full py-2 px-4 border border-[#0C2333] dark:border-neutral-400 rounded-md font-bold text-xs text-[#0C2333] dark:text-white cursor-pointer -mb-4"
+      >
+        {{ showFilters ? 'Ocultar filtros ▲' : 'Mostrar filtros ▼' }}
+      </button>
+
+      <aside
+        class="lg:col-span-1 space-y-5 text-sm lg:block"
+        :class="showFilters ? 'block' : 'hidden'"
+        data-purpose="sidebar-filters"
+      >
         <!-- Search Team Input -->
         <div class="relative">
           <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
@@ -253,6 +287,7 @@ function setPage(p: number) {
             v-model="filterState.teamSearch"
             class="w-full text-xs pl-9 pr-3 py-2 rounded-md border border-gray-300 dark:border-neutral-600 bg-[#F4F5F0] dark:bg-[#112C3F] text-slate-800 dark:text-white focus:bg-white dark:focus:bg-[#081722] focus:outline-none focus:ring-1 focus:ring-[#48B0DA]"
             placeholder="Buscar equipo..."
+            aria-label="Buscar equipo"
             type="text"
           />
         </div>
@@ -352,6 +387,7 @@ function setPage(p: number) {
               max="300000"
               step="5000"
               v-model.number="filterState.maxPrice"
+              aria-label="Precio máximo"
               class="w-full accent-[#48B0DA] cursor-pointer"
             />
             <div class="flex justify-between text-[11px] font-medium text-gray-700 dark:text-gray-300 mt-2">
@@ -399,7 +435,13 @@ function setPage(p: number) {
           class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5"
         >
           <div v-for="jersey in paginatedJerseys" :key="jersey.id" class="h-full">
-            <ProductCard :jersey="jersey" :show-badge="true" />
+            <ProductCard
+              :jersey="jersey"
+              :show-badge="true"
+              :show-admin-actions="isAdmin"
+              @edit="router.push(`/admin/editar/${$event.id}`)"
+              @delete="openDeleteConfirmation"
+            />
           </div>
         </transition-group>
 

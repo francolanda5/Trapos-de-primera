@@ -26,7 +26,7 @@ function toggle() {
   <div
     class="transition-all"
     :class="[
-      borderBottom ? 'border-b border-gray-200 pb-4' : '',
+      borderBottom ? 'border-b border-gray-200 dark:border-neutral-700 pb-4' : '',
       customClasses
     ]"
     data-purpose="filter-accordion"
@@ -34,13 +34,14 @@ function toggle() {
     <button
       type="button"
       @click="toggle"
-      class="w-full flex items-center justify-between text-left font-bold text-sm text-[#0C2333] mb-2 select-none cursor-pointer focus:outline-none"
+      :aria-expanded="isOpen"
+      class="w-full flex items-center justify-between text-left font-bold text-sm text-[#0C2333] dark:text-white mb-2 select-none cursor-pointer"
     >
       <slot name="header">
         <span class="font-bold text-xs sm:text-sm tracking-wide">{{ title }}</span>
       </slot>
       <svg
-        class="w-4 h-4 transform transition-transform duration-200 text-slate-600"
+        class="w-4 h-4 transform transition-transform duration-200 text-slate-600 dark:text-slate-300"
         :class="isOpen ? 'rotate-180' : 'rotate-0'"
         fill="none"
         stroke="currentColor"

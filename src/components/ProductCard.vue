@@ -8,15 +8,19 @@ const props = withDefaults(
     jersey: Jersey;
     horizontal?: boolean;
     showBadge?: boolean;
+    showAdminActions?: boolean;
   }>(),
   {
     horizontal: false,
-    showBadge: false
+    showBadge: false,
+    showAdminActions: false
   }
 );
 
+// La tarjeta no decide qué hacer al editar o eliminar: le avisa al padre con un emit.
 const emit = defineEmits<{
-  (e: 'select-size', size: string): void;
+  (e: 'edit', jersey: Jersey): void;
+  (e: 'delete', jersey: Jersey): void;
 }>();
 
 const addedFeedback = ref<string | null>(null);
@@ -70,12 +74,12 @@ function formatPrice(val: number): string {
 
     <router-link
       :to="`/camiseta/${jersey.id}`"
-      class="w-32 h-36 flex-shrink-0 flex items-center justify-center overflow-hidden bg-[#F7F4EA] dark:bg-[#081722] rounded-md p-1"
+      class="jersey-frame w-28 flex-shrink-0 bg-[#F7F4EA] dark:bg-[#081722] rounded-md p-1"
     >
       <img
         :src="jersey.image"
         :alt="jersey.name"
-        class="h-full object-contain group-hover:scale-105 transition-transform duration-300"
+        class="jersey-image group-hover:scale-105 transition-transform duration-300"
         loading="lazy"
       />
     </router-link>
@@ -142,12 +146,12 @@ function formatPrice(val: number): string {
     <!-- Contenedor Imagen -->
     <router-link
       :to="`/camiseta/${jersey.id}`"
-      class="h-44 sm:h-52 w-full flex items-center justify-center mb-3 overflow-hidden bg-[#F7F4EA]/60 dark:bg-[#081722]/80 rounded-lg p-2 relative"
+      class="jersey-frame w-full mb-3 bg-[#F7F4EA]/60 dark:bg-[#081722]/80 rounded-lg p-2 relative"
     >
       <img
         :src="jersey.image"
         :alt="`${jersey.name} ${jersey.season}`"
-        class="h-full w-full object-contain group-hover:scale-105 transition-transform duration-300"
+        class="jersey-image group-hover:scale-105 transition-transform duration-300"
         loading="lazy"
       />
 
@@ -214,6 +218,24 @@ function formatPrice(val: number): string {
       <p v-if="addedFeedback" class="text-[10px] font-bold mt-1 text-center" :class="addedFeedback.includes('✓') ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'">
         {{ addedFeedback }}
       </p>
+
+      <!-- Acciones de administrador (CRUD desde el listado) -->
+      <div v-if="showAdminActions" class="mt-2 pt-2 border-t border-neutral-100 dark:border-neutral-800 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          @click="emit('edit', jersey)"
+          class="py-1 text-[11px] font-bold rounded border border-[#0C2333] dark:border-neutral-500 text-[#0C2333] dark:text-white hover:bg-slate-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+        >
+          Editar
+        </button>
+        <button
+          type="button"
+          @click="emit('delete', jersey)"
+          class="py-1 text-[11px] font-bold rounded border border-red-500 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
+        >
+          Eliminar
+        </button>
+      </div>
     </div>
   </article>
 </template>
