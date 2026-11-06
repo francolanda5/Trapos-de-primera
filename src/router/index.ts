@@ -9,7 +9,7 @@ import AdminOrdersView from '../views/AdminOrdersView.vue';
 import AdminMessagesView from '../views/AdminMessagesView.vue';
 import UserOrdersView from '../views/UserOrdersView.vue';
 import SizeGuideView from '../views/SizeGuideView.vue';
-import { isAdmin, isAuthenticated, openLoginModal } from '../store/useAuth';
+import { isAdmin, isAuthenticated, openLoginModal, authReady } from '../store/useAuth';
 
 const routes: RouteRecordRaw[] = [
   {
@@ -92,7 +92,8 @@ export const router = createRouter({
 
 // Guard global: corre antes de cada cambio de ruta y mira el meta de la ruta destino.
 // Si el usuario no tiene permiso, lo manda al Inicio y le abre el modal de login.
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
+  await authReady; // con Supabase, espera a recuperar la sesión antes de decidir
   if (to.meta.requiresAdmin && !isAdmin.value) {
     openLoginModal('Esta sección es solo para administradores.');
     return '/';

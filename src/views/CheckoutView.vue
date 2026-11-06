@@ -144,7 +144,7 @@ async function handleConfirmOrder() {
   errors.stockError = undefined;
 
   try {
-    const res = createOrder({
+    const res = await createOrder({
       buyer,
       deliveryMethod: deliveryMethod.value,
       paymentMethod: paymentMethod.value,

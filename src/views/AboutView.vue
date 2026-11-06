@@ -23,10 +23,15 @@ function validateContact(): boolean {
   return !contactErrors.name && !contactErrors.email && !contactErrors.message;
 }
 
-function handleContactSubmit() {
+async function handleContactSubmit() {
   if (!validateContact()) return;
-  // No hay servidor: el mensaje se guarda en LocalStorage y el administrador lo lee en /admin/mensajes.
-  addMessage(contactForm);
+  // El mensaje se guarda (en Supabase, o en LocalStorage si no está configurado) y el administrador lo lee en /admin/mensajes.
+  try {
+    await addMessage(contactForm);
+  } catch (e) {
+    contactErrors.message = 'No se pudo enviar el mensaje. Probá de nuevo en un rato.';
+    return;
+  }
   formSent.value = true;
   setTimeout(() => {
     contactForm.name = '';

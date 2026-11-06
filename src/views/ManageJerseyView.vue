@@ -5,7 +5,8 @@ import {
   createJersey,
   updateJersey,
   deleteJersey,
-  getJerseyById
+  getJerseyById,
+  jerseysReady
 } from '../store/useStore';
 import type { Jersey } from '../types';
 import ConfirmModal from '../components/ConfirmModal.vue';
@@ -135,7 +136,8 @@ function loadForm() {
       form.image = existing.image;
       form.description = existing.description;
     } else {
-      router.replace('/admin/camisetas');
+      // Con Supabase puede ser una camiseta que todavía se está cargando
+      jerseysReady.then(() => (getJerseyById(editingId.value) ? loadForm() : router.replace('/admin/camisetas')));
     }
   }
 }

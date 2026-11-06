@@ -4,6 +4,11 @@ import { INITIAL_JERSEYS } from '../data/initialJerseys';
 import { getGeneratedImages, isLegacyPhoto, upgradeJerseyImages } from '../data/jerseyImages';
 import { fetchDolarQuotes } from '../services/apiService';
 import { currentUser, openLoginModal } from './useAuth';
+import { isSupabaseEnabled } from '../services/supabaseClient';
+import * as remote from '../services/supabaseData';
+
+// Se pone en true al final de este archivo: antes de eso no se pide nada a Supabase
+let storeReady = false;
 
 const STORAGE_KEYS = {
   JERSEYS: 'tdp_jerseys_v2',
@@ -152,7 +157,7 @@ try {
 // 2. Estado Global Reactivo
 export const jerseys = ref<Jersey[]>(migrateAndLoadJerseys());
 export const cart = ref<CartItem[]>(loadStoredCart());
-export const orders = ref<Order[]>(loadStoredOrders());
+export const orders = ref<Order[]>(isSupabaseEnabled ? [] : loadStoredOrders()); // con Supabase se cargan al iniciar sesión
 export const theme = ref<'light' | 'dark'>(loadStoredTheme());
 
 // Control de Drawers y Modales
@@ -167,8 +172,9 @@ export const favorites = ref<string[]>(loadStoredFavorites(currentUser.value?.id
 watch(
   currentUser,
   (newUser) => {
-    favorites.value = loadStoredFavorites(newUser?.id);
+    favorites.value = isSupabaseEnabled ? [] : loadStoredFavorites(newUser?.id);
     if (!newUser) isFavoritesOpen.value = false;
+    if (isSupabaseEnabled) loadUserData(newUser?.id, newUser?.role === 'admin');
   },
   { immediate: true }
 );
@@ -259,6 +265,7 @@ watch(
 watch(
   orders,
   (newVal) => {
+    if (isSupabaseEnabled) return; // con Supabase los pedidos viven en la base, no en el navegador
     try {
       localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(newVal));
     } catch (e) {
@@ -374,6 +381,7 @@ export function createJersey(newJerseyData: Omit<Jersey, 'id' | 'stock'> & { siz
   };
 
   jerseys.value.unshift(created);
+  syncRemote(() => remote.saveJersey(created), 'guardar la camiseta');
   return created;
 }
 
@@ -395,6 +403,7 @@ export function updateJersey(id: string, updatedData: Partial<Jersey>): boolean 
   };
 
   jerseys.value[index] = updated;
+  syncRemote(() => remote.saveJersey(updated), 'guardar la camiseta');
 
   // Actualizar también en el carrito si existía ese producto
   cart.value = cart.value.map((item) => {
@@ -410,6 +419,7 @@ export function updateJersey(id: string, updatedData: Partial<Jersey>): boolean 
 export function deleteJersey(id: string): boolean {
   const initialLength = jerseys.value.length;
   jerseys.value = jerseys.value.filter((j) => j.id !== id);
+  syncRemote(() => remote.removeJersey(id), 'eliminar la camiseta');
 
   cart.value = cart.value.filter((item) => item.jersey.id !== id);
   favorites.value = favorites.value.filter((favId) => favId !== id);
@@ -424,6 +434,7 @@ export function getJerseyById(id: string): Jersey | undefined {
 export function resetToDefaultJerseys() {
   jerseys.value = JSON.parse(JSON.stringify(INITIAL_JERSEYS));
   localStorage.setItem(STORAGE_KEYS.JERSEYS, JSON.stringify(INITIAL_JERSEYS));
+  syncRemote(() => remote.replaceJerseys(INITIAL_JERSEYS), 'restaurar el inventario');
 }
 
 // 6. Métodos de Carrito y Validación de Stock por Talle
@@ -486,14 +497,30 @@ export function clearCart() {
 }
 
 // 7. Flujo de Pedidos y Descuento Atómico de Stock
-export function createOrder(data: {
+export async function createOrder(data: {
   buyer: BuyerInfo;
   deliveryMethod: DeliveryMethod;
   paymentMethod: PaymentMethod;
   receiptImage?: string;
-}): { success: boolean; order?: Order; error?: string } {
+}): Promise<{ success: boolean; order?: Order; error?: string }> {
   if (cart.value.length === 0) {
     return { success: false, error: 'El carrito de compras está vacío.' };
+  }
+
+  // Con Supabase, la función create_order de la base valida el stock, lo descuenta y crea el pedido
+  if (isSupabaseEnabled) {
+    try {
+      const order = await remote.createOrderRemote({
+        ...data,
+        items: cart.value.map((item) => ({ jerseyId: item.jersey.id, size: item.size, quantity: item.quantity }))
+      });
+      orders.value.unshift(order);
+      clearCart();
+      await refreshJerseys(); // trae el stock nuevo
+      return { success: true, order };
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'No se pudo crear el pedido.' };
+    }
   }
 
   // 1. Validar existencias de cada talle en el momento de la confirmación
@@ -591,7 +618,7 @@ function findStockProblem(order: Order): string | null {
  * - De Cancelado a Pendiente o Pagado: vuelve a descontar, pero solo si hay stock de todo el pedido.
  *   Si falta algo, el pedido no cambia y se devuelve el motivo (nada se descuenta a medias).
  */
-export function updateOrderStatus(orderId: string, newStatus: OrderStatus): { success: boolean; error?: string } {
+function updateOrderStatusLocal(orderId: string, newStatus: OrderStatus): { success: boolean; error?: string } {
   const order = orders.value.find((o) => o.id === orderId);
   if (!order) return { success: false, error: 'El pedido no existe' };
 
@@ -611,6 +638,14 @@ export function updateOrderStatus(orderId: string, newStatus: OrderStatus): { su
   return { success: true };
 }
 
+// Con Supabase, el cambio de estado y el stock los resuelve la función set_order_status de la base.
+export async function updateOrderStatus(orderId: string, newStatus: OrderStatus): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseEnabled) return updateOrderStatusLocal(orderId, newStatus);
+  const res = await changeStatusRemote(orderId, newStatus);
+  await refreshAfterStatusChange();
+  return res;
+}
+
 export interface BulkStatusResult {
   updated: string[];
   unchanged: string[];
@@ -621,7 +656,7 @@ export interface BulkStatusResult {
  * Cambia el estado de varios pedidos, de a uno. Como el stock se actualiza en cada paso,
  * dos pedidos que compiten por la última unidad no pueden reactivarse los dos.
  */
-export function updateOrdersStatus(orderIds: string[], newStatus: OrderStatus): BulkStatusResult {
+export async function updateOrdersStatus(orderIds: string[], newStatus: OrderStatus): Promise<BulkStatusResult> {
   const result: BulkStatusResult = { updated: [], unchanged: [], skipped: [] };
 
   for (const id of orderIds) {
@@ -629,13 +664,14 @@ export function updateOrdersStatus(orderIds: string[], newStatus: OrderStatus): 
       result.unchanged.push(id);
       continue;
     }
-    const res = updateOrderStatus(id, newStatus);
+    const res = isSupabaseEnabled ? await changeStatusRemote(id, newStatus) : updateOrderStatusLocal(id, newStatus);
     if (res.success) {
       result.updated.push(id);
     } else {
       result.skipped.push({ id, reason: res.error || 'No se pudo actualizar' });
     }
   }
+  if (isSupabaseEnabled) await refreshAfterStatusChange();
   return result;
 }
 
@@ -646,11 +682,14 @@ export function toggleFavorite(id: string) {
     openLoginModal('Iniciá sesión para guardar favoritos');
     return;
   }
+  const userId = currentUser.value.id;
   const idx = favorites.value.indexOf(id);
   if (idx > -1) {
     favorites.value.splice(idx, 1);
+    syncRemote(() => remote.removeFavoriteRemote(userId, id), 'quitar el favorito');
   } else {
     favorites.value.push(id);
+    syncRemote(() => remote.addFavoriteRemote(userId, id), 'guardar el favorito');
   }
 }
 
@@ -710,11 +749,12 @@ function loadStoredMessages(): ContactMessage[] {
   return [];
 }
 
-export const messages = ref<ContactMessage[]>(loadStoredMessages());
+export const messages = ref<ContactMessage[]>(isSupabaseEnabled ? [] : loadStoredMessages()); // con Supabase los carga el administrador
 
 watch(
   messages,
   (newVal) => {
+    if (isSupabaseEnabled) return; // con Supabase los mensajes viven en la base
     try {
       localStorage.setItem(MESSAGES_KEY, JSON.stringify(newVal));
     } catch (e) {
@@ -726,7 +766,12 @@ watch(
 
 export const unreadMessagesCount = computed(() => messages.value.filter((m) => !m.read).length);
 
-export function addMessage(data: { name: string; email: string; message: string }): ContactMessage {
+export async function addMessage(data: { name: string; email: string; message: string }): Promise<void> {
+  // Con Supabase el mensaje va a la tabla messages y el administrador lo lee desde cualquier dispositivo
+  if (isSupabaseEnabled) {
+    await remote.insertMessageRemote(data);
+    return;
+  }
   const created: ContactMessage = {
     id: `msg-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     name: data.name.trim(),
@@ -736,20 +781,105 @@ export function addMessage(data: { name: string; email: string; message: string 
     read: false
   };
   messages.value.unshift(created); // el más nuevo, primero
-  return created;
 }
 
 export function setMessageRead(id: string, read: boolean) {
   const found = messages.value.find((m) => m.id === id);
   if (found) found.read = read;
+  syncRemote(() => remote.setMessageReadRemote(id, read), 'marcar el mensaje');
 }
 
 export function markAllMessagesRead() {
   messages.value.forEach((m) => {
     m.read = true;
   });
+  syncRemote(() => remote.markAllMessagesReadRemote(), 'marcar los mensajes');
 }
 
 export function deleteMessage(id: string) {
   messages.value = messages.value.filter((m) => m.id !== id);
+  syncRemote(() => remote.removeMessageRemote(id), 'eliminar el mensaje');
 }
+
+// 12. Conexión con Supabase: carga de datos y guardado en segundo plano.
+// Si algo falla (por ejemplo, un cliente que intenta modificar el catálogo) se avisa en pantalla.
+export const syncError = ref<string>('');
+
+function reportSyncError(what: string, e: unknown) {
+  const detail = e instanceof Error ? e.message : String(e);
+  console.error(`[Supabase] No se pudo ${what}:`, e);
+  syncError.value = `No se pudo ${what} en Supabase: ${detail}`;
+}
+
+// Guarda en Supabase sin frenar la pantalla. Sin Supabase no hace nada.
+function syncRemote(task: () => Promise<unknown>, what: string) {
+  if (!isSupabaseEnabled) return;
+  task().catch((e) => reportSyncError(what, e));
+}
+
+export async function refreshJerseys(): Promise<void> {
+  try {
+    const list = await remote.fetchJerseys();
+    // Si la tabla está vacía (todavía no se corrió supabase/setup.sql) se conservan las camisetas de siempre
+    if (list.length > 0) jerseys.value = list;
+  } catch (e) {
+    reportSyncError('cargar las camisetas', e);
+  }
+}
+
+async function refreshOrders(): Promise<void> {
+  try {
+    orders.value = currentUser.value ? await remote.fetchOrders() : [];
+  } catch (e) {
+    reportSyncError('cargar los pedidos', e);
+  }
+}
+
+async function refreshFavorites(): Promise<void> {
+  try {
+    favorites.value = currentUser.value ? await remote.fetchFavorites() : [];
+  } catch (e) {
+    reportSyncError('cargar los favoritos', e);
+  }
+}
+
+async function refreshMessages(): Promise<void> {
+  try {
+    messages.value = await remote.fetchMessages();
+  } catch (e) {
+    reportSyncError('cargar los mensajes', e);
+  }
+}
+
+// Al iniciar o cerrar sesión se cargan (o se vacían) los datos de esa persona
+function loadUserData(userId: string | undefined, admin: boolean) {
+  if (!storeReady) return;
+  if (!userId) {
+    orders.value = [];
+    favorites.value = [];
+    messages.value = [];
+    return;
+  }
+  void refreshOrders();
+  void refreshFavorites();
+  if (admin) void refreshMessages();
+  else messages.value = [];
+}
+
+async function changeStatusRemote(id: string, status: OrderStatus): Promise<{ success: boolean; error?: string }> {
+  try {
+    await remote.setOrderStatusRemote(id, status);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'No se pudo actualizar' };
+  }
+}
+
+async function refreshAfterStatusChange(): Promise<void> {
+  await Promise.all([refreshOrders(), refreshJerseys()]);
+}
+
+// Las camisetas se cargan al abrir la web. Las pantallas que necesitan una camiseta puntual esperan a esta promesa.
+export const jerseysReady: Promise<void> = isSupabaseEnabled ? refreshJerseys() : Promise.resolve();
+
+storeReady = true;

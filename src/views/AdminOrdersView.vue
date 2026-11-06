@@ -44,12 +44,13 @@ const bulkMessage = computed(() => {
   return `${base} Los pedidos cancelados vuelven a descontar stock, y se omiten si no alcanza.`;
 });
 
-function onConfirmBulk() {
-  if (bulkTarget.value) {
-    lastResult.value = updateOrdersStatus(selectedIds.value, bulkTarget.value);
-  }
+async function onConfirmBulk() {
+  const target = bulkTarget.value;
+  const ids = [...selectedIds.value];
+  // Se cierra el cuadro enseguida; el resultado aparece cuando termina (con Supabase tarda un instante)
   bulkTarget.value = null;
   clearSelection();
+  if (target) lastResult.value = await updateOrdersStatus(ids, target);
 }
 
 // Resumen del resultado, por ejemplo: "5 actualizados, 1 omitido por falta de stock"
@@ -77,7 +78,7 @@ function openOrderDetails(order: Order) {
   selectedOrder.value = order;
 }
 
-function handleStatusChange(order: Order, event: Event) {
+async function handleStatusChange(order: Order, event: Event) {
   const select = event.target as HTMLSelectElement;
   const newStatus = select.value as OrderStatus;
   // El select vuelve al estado real: solo cambia si el pedido cambia de verdad
@@ -88,14 +89,15 @@ function handleStatusChange(order: Order, event: Event) {
     showCancelConfirmModal.value = true;
     return;
   }
-  lastResult.value = updateOrdersStatus([order.id], newStatus);
+  lastResult.value = await updateOrdersStatus([order.id], newStatus);
 }
 
-function onConfirmCancel() {
+async function onConfirmCancel() {
   if (orderToCancel.value) {
-    lastResult.value = updateOrdersStatus([orderToCancel.value.id], 'Cancelado');
+    const id = orderToCancel.value.id;
     showCancelConfirmModal.value = false;
     orderToCancel.value = null;
+    lastResult.value = await updateOrdersStatus([id], 'Cancelado');
   }
 }
 

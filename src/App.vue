@@ -11,7 +11,8 @@ import {
   initializeApiService,
   deleteModalState,
   confirmDeleteJersey,
-  closeDeleteConfirmation
+  closeDeleteConfirmation,
+  syncError
 } from './store/useStore';
 
 // onMounted() es el mounted() de la Composition API: corre cuando el DOM ya está listo.
@@ -46,6 +47,16 @@ onMounted(() => {
 
     <!-- Modal de Inicio de Sesión y Creación de Cuenta (con soporte Google GIS) -->
     <AuthModal />
+
+    <!-- Aviso si falla un guardado o una carga en Supabase -->
+    <div
+      v-if="syncError"
+      role="alert"
+      class="fixed bottom-4 left-4 right-4 sm:right-auto sm:max-w-md z-40 p-3 rounded-lg bg-red-600 text-white text-xs shadow-xl flex items-start justify-between gap-3"
+    >
+      <span>{{ syncError }}</span>
+      <button type="button" @click="syncError = ''" aria-label="Cerrar aviso" class="font-bold cursor-pointer">✕</button>
+    </div>
 
     <!-- Botón flotante para volver arriba -->
     <ScrollTopButton />

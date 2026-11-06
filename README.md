@@ -11,9 +11,9 @@ Trabajo Práctico Integrador de **Práctica Profesionalizante Desarrollo Web y M
 
 **Trapos de Primera** es una SPA (Single Page Application) hecha con Vue 3 que simula una tienda de camisetas del fútbol argentino: actuales y retro, de Primera División, Primera Nacional, Primera B Metropolitana y la Selección.
 
-Permite gestionar un catálogo de 18 camisetas con stock por talle, buscar y filtrar, comprar con un checkout de 5 pasos y administrar los pedidos. Los datos se guardan en el `localStorage` del navegador y además se consume una API pública con `fetch`.
+Permite gestionar un catálogo de 18 camisetas con stock por talle, buscar y filtrar, comprar con un checkout de 5 pasos y administrar los pedidos. Los datos viven en una base de datos de **Supabase** (PostgreSQL), con inicio de sesión con Google o con correo. Si Supabase no está configurado, la app funciona igual y guarda todo en el `localStorage` del navegador. Además consume una API pública con `fetch`.
 
-Es una aplicación de práctica: no hay servidor, ni cobros, ni envío real de mensajes.
+Es una aplicación de práctica: no hay cobros ni envío real de correos.
 
 ## Tecnologías
 
@@ -24,9 +24,10 @@ Es una aplicación de práctica: no hay servidor, ni cobros, ni envío real de m
 | Vite 8 | Servidor de desarrollo y compilación (ver [Nota sobre Vite](#nota-sobre-vite)) |
 | TypeScript 7 | Tipado |
 | Tailwind CSS 4 | Estilos y diseño responsive |
-| LocalStorage | Persistencia de datos |
+| Supabase | Base de datos PostgreSQL, login con Google y correo (Supabase Auth) y seguridad por filas (RLS) |
+| LocalStorage | Persistencia cuando Supabase no está configurado, y caché del catálogo y del carrito |
 | Fetch API | Consumo de DolarAPI |
-| Web Crypto API | Hash SHA-256 de las contraseñas |
+| Web Crypto API | Hash SHA-256 de las contraseñas (solo en modo LocalStorage) |
 
 ## Instrucciones de instalación
 
@@ -45,7 +46,7 @@ npm run preview   # sirve lo compilado en dist/
 npm run lint      # chequeo de tipos con TypeScript
 ```
 
-No hace falta configurar nada más. El archivo `.env.example` tiene una única variable opcional, `VITE_GOOGLE_CLIENT_ID`, explicada en [Cuentas de prueba](#cuentas-de-prueba).
+Sin configurar nada, la app corre en modo LocalStorage. Para usar Supabase, copiá `.env.example` como `.env.local` y completá `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` (Supabase > Connect > Vue). Los pasos están en [Supabase](#supabase). El archivo tiene además `VITE_GOOGLE_CLIENT_ID`, para el botón de Google cuando no se usa Supabase.
 
 ## Capturas de pantalla
 
@@ -97,8 +98,11 @@ No hace falta configurar nada más. El archivo `.env.example` tiene una única v
 - Formularios con `v-model` y validaciones propias, con el mensaje de error junto a cada campo: alta y edición, login y registro, checkout y contacto.
 - Se valida obligatoriedad, longitud mínima y formato (temporada, precio, stock entero, URL de imagen, email, teléfono).
 
-**Persistencia en LocalStorage**
-- Camisetas, carrito, pedidos, favoritos por usuario, usuarios, sesión y tema. Los datos sobreviven a recargar y a cerrar el navegador.
+**Persistencia**
+- **Con Supabase:** camisetas, perfiles con su rol, pedidos con sus ítems, favoritos y mensajes de contacto viven en la base y se comparten entre dispositivos. El carrito y el tema quedan en el navegador.
+- **Seguridad por filas (RLS):** el catálogo lo ve cualquiera y solo lo modifica un administrador; cada cliente ve solo sus pedidos y favoritos; los mensajes los envía cualquiera y solo los lee el administrador.
+- **Stock:** al comprar, la función `create_order` de la base valida y descuenta el stock en un solo paso, y toma los precios de la tabla, no del navegador. Cancelar un pedido lo devuelve una sola vez (`set_order_status`).
+- **Sin Supabase (modo LocalStorage):** camisetas, carrito, pedidos, favoritos por usuario, usuarios, sesión y tema. Los datos sobreviven a recargar y a cerrar el navegador.
 
 **Consumo de APIs con fetch** (`src/services/apiService.ts`)
 - **DolarAPI**: la cotización del dólar tarjeta se muestra en la barra superior, en todas las páginas. Si la API falla, queda un texto fijo y la app sigue funcionando.
@@ -109,7 +113,7 @@ No hace falta configurar nada más. El archivo `.env.example` tiene una única v
 - Confirmar un pedido descuenta el stock de cada talle y cancelarlo lo devuelve una sola vez. Reactivar un pedido cancelado vuelve a descontar, solo si hay stock.
 - Administración de pedidos con acciones masivas: selección múltiple, confirmación y resumen del resultado.
 - Guía de talles con tabla de medidas.
-- Mensajes de contacto: lo que se escribe en el formulario de "Acerca de" se guarda y el administrador lo lee en `/admin/mensajes`, con filtros, marcado de leídos, respuesta por correo y baja. El menú del administrador avisa cuántos hay sin leer.
+- Mensajes de contacto: lo que se escribe en el formulario de "Acerca de" se guarda (con Supabase, llega desde cualquier dispositivo) y el administrador lo lee en `/admin/mensajes`, con filtros, marcado de leídos, respuesta por correo y baja. El menú del administrador avisa cuántos hay sin leer.
 
 **Galería de cada camiseta**
 - Frente, espalda y detalle, con miniaturas y fundido entre vistas. En el celular también se pasa de una a otra deslizando.
@@ -123,21 +127,35 @@ No hace falta configurar nada más. El archivo `.env.example` tiene una única v
 - Diseño responsive para celular, tablet y escritorio, botón flotante para volver arriba y modo claro/oscuro persistente.
 
 **Limitaciones conocidas**
-- Los mensajes de contacto se guardan en el navegador, sin servidor: el administrador solo ve los que se enviaron desde ese mismo navegador.
-- El login es una simulación didáctica: todo corre en el navegador, así que no ofrece seguridad real.
+- Sin Supabase (modo LocalStorage) todo corre en el navegador: los datos no se comparten entre dispositivos y el login es una simulación sin seguridad real.
+- Con Supabase, el administrador es una cuenta marcada en la base (`supabase/admin.sql`): desde la web nadie puede cambiar su propio rol. La contraseña de prueba es sencilla a propósito y conviene cambiarla después de la entrega.
 - Las imágenes de las camisetas son recreaciones generadas: marcas, sponsors y diseños no se contrastaron con fotos documentales.
-- El inicio de sesión con Google requiere configurar un Client ID propio y no se probó de punta a punta en esta entrega. El token se decodifica sin verificar la firma.
+- Las pruebas automáticas no completan un inicio de sesión real con Google: se probó a mano. Sin Supabase, el botón de Google usa Google Identity Services y decodifica el token sin verificar la firma.
 
 ## Cuentas de prueba
 
+**Con Supabase (versión publicada):**
+
 | Rol | Email | Contraseña |
 |---|---|---|
-| Administrador | `admin@traposdeprimera.com` | `admin123` |
-| Cliente | `franco@gmail.com` | `cliente123` |
+| Administrador | `admin@traposdeprimera.com` | `Trapos-Admin-2026` |
+| Cliente | `cliente-prueba@traposdeprimera.com` | `Cliente-Prueba-2026` |
 
-El modal de login también tiene un acceso rápido, "Ingresar como Administrador", para facilitar la corrección.
+También se puede entrar con Google, siempre como cliente.
 
-**Google (opcional):** con `VITE_GOOGLE_CLIENT_ID` configurada aparece el botón oficial de Google; sin ella, el modal indica "Google no configurado". Quien ingresa por esa vía siempre recibe el rol de cliente. El Client ID se crea en Google Cloud Console (Credenciales > ID de cliente de OAuth > Aplicación web), con `http://localhost:3000` y la URL de producción como orígenes autorizados, y se guarda en un archivo `.env.local`.
+**Sin Supabase (modo LocalStorage):** `admin@traposdeprimera.com` / `admin123` y `franco@gmail.com` / `cliente123`. El modal de login tiene además un acceso rápido, "Ingresar como Administrador".
+
+**Google sin Supabase (opcional):** con `VITE_GOOGLE_CLIENT_ID` configurada aparece el botón oficial de Google; sin ella, el modal indica "Google no configurado". Quien ingresa por esa vía siempre recibe el rol de cliente. El Client ID se crea en Google Cloud Console (Credenciales > ID de cliente de OAuth > Aplicación web), con `http://localhost:3000` y la URL de producción como orígenes autorizados, y se guarda en un archivo `.env.local`.
+
+## Supabase
+
+La base de datos y el login están en [Supabase](https://supabase.com). Para armarlo en un proyecto nuevo:
+
+1. Crear el proyecto y, en **SQL Editor**, ejecutar [supabase/setup.sql](supabase/setup.sql): crea las tablas, la seguridad por filas, las funciones de stock y las 18 camisetas.
+2. En **Authentication > Sign In / Providers > Google**, cargar el Client ID y el Client Secret de Google Cloud. En Google Cloud, agregar como URI de redireccionamiento `https://<proyecto>.supabase.co/auth/v1/callback`.
+3. En **Authentication > URL Configuration**, poner la URL de la web como Site URL y sumarla, con `http://localhost:3000`, a las redirecciones.
+4. Para el administrador, iniciar sesión una vez con esa cuenta y ejecutar [supabase/admin.sql](supabase/admin.sql) con su correo.
+5. Cargar `VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY` en `.env.local` y, para publicar, en las variables de entorno de Vercel (y redeplegar). La publishable key es pública a propósito: los datos los protege la seguridad por filas. Nunca va acá la secret key ni la `service_role`.
 
 ## Créditos de imágenes
 

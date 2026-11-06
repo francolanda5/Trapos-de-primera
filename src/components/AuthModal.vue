@@ -7,8 +7,10 @@ import {
   loginWithEmail,
   registerWithEmail,
   loginAsTestAdmin,
-  loginWithGoogleCredential
+  loginWithGoogleCredential,
+  loginWithGoogleOAuth
 } from '../store/useAuth';
+import { isSupabaseEnabled } from '../services/supabaseClient';
 import {
   GOOGLE_CLIENT_ID,
   loadGoogleIdentityScript
@@ -34,8 +36,17 @@ const errors = reactive<{
 }>({});
 
 const isSubmitting = ref(false);
+const info = ref(''); // aviso en verde, por ejemplo "confirmá tu correo"
+
+// Con Supabase, Google se maneja con Supabase Auth: lleva a Google y vuelve a la web con la sesión iniciada
+async function handleGoogleOAuth() {
+  resetErrors();
+  const res = await loginWithGoogleOAuth();
+  if (!res.success) errors.general = res.error;
+}
 
 function resetErrors() {
+  info.value = '';
   errors.name = undefined;
   errors.email = undefined;
   errors.password = undefined;
@@ -98,6 +109,10 @@ async function handleSubmit() {
       const res = await registerWithEmail(form.name, form.email, form.password);
       if (!res.success) {
         errors.general = res.error || 'No se pudo completar el registro.';
+      } else if (res.info) {
+        info.value = res.info;
+        form.password = '';
+        form.confirmPassword = '';
       }
     }
   } finally {
@@ -107,7 +122,7 @@ async function handleSubmit() {
 
 // Dibuja el botón oficial de Google. Solo si hay Client ID: sin él no se carga nada de Google.
 async function setupGoogleButton() {
-  if (!GOOGLE_CLIENT_ID) return;
+  if (isSupabaseEnabled || !GOOGLE_CLIENT_ID) return; // con Supabase no se usa el botón de Google Identity
 
   const loaded = await loadGoogleIdentityScript();
   if (!loaded || !window.google?.accounts?.id) {
@@ -214,6 +229,15 @@ watch(
             {{ authModalMessage }}
           </div>
 
+          <!-- Aviso de éxito (por ejemplo, confirmar el correo) -->
+          <div
+            v-if="info"
+            role="status"
+            class="mb-4 p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 text-xs rounded font-medium"
+          >
+            {{ info }}
+          </div>
+
           <!-- Alerta de error general -->
           <div
             v-if="errors.general"
@@ -313,7 +337,23 @@ watch(
 
           <!-- Contenedor Google Identity Services -->
           <div class="flex flex-col items-center justify-center">
-            <div v-if="GOOGLE_CLIENT_ID && !googleLoadFailed" ref="googleButtonContainer" class="w-full flex justify-center min-h-11"></div>
+            <!-- Con Supabase: Google por Supabase Auth -->
+            <button
+              v-if="isSupabaseEnabled"
+              type="button"
+              @click="handleGoogleOAuth"
+              class="w-full min-h-11 flex items-center justify-center gap-3 bg-white hover:bg-neutral-50 text-slate-700 border border-neutral-300 rounded text-sm font-semibold transition-colors cursor-pointer"
+            >
+              <svg class="w-5 h-5" viewBox="0 0 48 48" aria-hidden="true">
+                <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/>
+                <path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/>
+                <path fill="#FBBC05" d="M10.5 28.7c-.5-1.5-.8-3.1-.8-4.7s.3-3.2.8-4.7l-7.9-6.1C.9 16.4 0 20.1 0 24s.9 7.6 2.6 10.8l7.9-6.1z"/>
+                <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/>
+              </svg>
+              <span>Continuar con Google</span>
+            </button>
+
+            <div v-else-if="GOOGLE_CLIENT_ID && !googleLoadFailed" ref="googleButtonContainer" class="w-full flex justify-center min-h-11"></div>
 
             <div v-else class="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 rounded text-[11px] text-amber-900 dark:text-amber-200 w-full text-center">
               <p class="font-bold mb-1">{{ GOOGLE_CLIENT_ID ? 'No se pudo cargar Google' : 'Google no configurado' }}</p>
@@ -324,7 +364,7 @@ watch(
           </div>
 
           <!-- Acceso Rápido Administrador de Prueba -->
-          <div class="mt-6 pt-4 border-t border-neutral-200 dark:border-neutral-700 text-center">
+          <div v-if="!isSupabaseEnabled" class="mt-6 pt-4 border-t border-neutral-200 dark:border-neutral-700 text-center">
             <p class="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
               ¿Querés probar las funciones de gestión y pedidos?
             </p>

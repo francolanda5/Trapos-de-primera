@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   getJerseyById,
   jerseys,
+  jerseysReady,
   addToCart,
   toggleFavorite,
   isFavorite
@@ -21,9 +22,14 @@ const selectedSize = ref<string>('M');
 const quantity = ref<number>(1);
 const addedToCartSuccess = ref<string | null>(null);
 
-function loadProduct() {
+async function loadProduct() {
   const id = String(route.params.id);
-  const found = getJerseyById(id);
+  let found = getJerseyById(id);
+  if (!found) {
+    // Con Supabase, una camiseta creada en otro dispositivo llega recién cuando termina de cargar el catálogo
+    await jerseysReady;
+    found = getJerseyById(id);
+  }
   if (found) {
     jersey.value = found;
     activeImageIndex.value = 0;
